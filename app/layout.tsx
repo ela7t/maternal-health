@@ -1,24 +1,11 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
-import {
-  HeartPulse,
-  Users,
-  CalendarCheck,
-  BookOpenText,
-  Send,
-  Building2,
-  ShieldCheck,
-  Activity,
-  CheckCircle2,
-} from "lucide-react";
-
-const font = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"] });
+import { NavLinks } from "@/components/NavLinks";
 
 export const metadata: Metadata = {
-  title: "Maternal & Newborn Care System | Wolkite & Jimma Protocol",
-  description: "Automated SMS Reminder System for Maternal & Newborn Health in Ethiopia.",
+  title: "Clinical Overview - Maternal & Newborn Care",
+  description: "Automated SMS Reminder System for Maternal and Newborn Health",
 };
 
 export default function RootLayout({
@@ -28,113 +15,68 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${font.className} min-h-screen flex flex-col bg-slate-50 text-slate-900`}>
-        {/* Top Clinical Header Bar */}
-        <div className="bg-white border-b border-slate-200 px-4 sm:px-8 py-2.5 flex flex-wrap items-center justify-between text-xs text-slate-600 gap-2">
-          <div className="flex items-center gap-3">
-            <span className="font-semibold text-slate-800 flex items-center gap-1.5">
-              <Building2 className="w-4 h-4 text-teal-700" />
-              Wolkite Health Center & Jimma Primary Hospital
-            </span>
-            <span className="text-slate-300">|</span>
-            <span className="text-slate-500 hidden sm:inline">MNH Automated SMS Platform</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              AfroMessage Gateway Live
-            </span>
-            <span className="text-slate-300">|</span>
-            <span className="text-slate-500">Ethiopian Calendar (ዓ.ም.) Active</span>
-          </div>
-        </div>
-
-        {/* Main Dark Slate Navigation Bar */}
-        <header className="sticky top-0 z-40 bg-slate-900 text-white shadow-md">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-14">
-              {/* Brand Logo */}
-              <Link href="/" className="flex items-center gap-2.5 group">
-                <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center text-white shadow-sm group-hover:bg-teal-500 transition">
-                  <HeartPulse className="w-5 h-5" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-white text-base tracking-tight leading-none">
-                    MNH Reminder
-                  </span>
-                  <span className="text-[10px] text-teal-400 font-medium mt-0.5">
-                    Jimma / Wolkite Clinical Protocol
-                  </span>
-                </div>
-              </Link>
-
-              {/* Navigation Links */}
-              <nav className="hidden md:flex items-center space-x-1 h-full">
-                <Link
-                  href="/"
-                  className="px-3.5 h-full flex items-center text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 border-b-2 border-transparent hover:border-teal-400 transition"
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  href="/mothers"
-                  className="px-3.5 h-full flex items-center text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 border-b-2 border-transparent hover:border-teal-400 transition gap-1.5"
-                >
-                  <Users className="w-4 h-4 text-slate-400" />
-                  Mothers Registry
-                </Link>
-                <Link
-                  href="/visits"
-                  className="px-3.5 h-full flex items-center text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 border-b-2 border-transparent hover:border-teal-400 transition gap-1.5"
-                >
-                  <CalendarCheck className="w-4 h-4 text-slate-400" />
-                  Visits & Triage
-                </Link>
-                <Link
-                  href="/messages"
-                  className="px-3.5 h-full flex items-center text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 border-b-2 border-transparent hover:border-teal-400 transition gap-1.5"
-                >
-                  <BookOpenText className="w-4 h-4 text-slate-400" />
-                  Message Bank
-                </Link>
-                <Link
-                  href="/activity"
-                  className="px-3.5 h-full flex items-center text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 border-b-2 border-transparent hover:border-teal-400 transition gap-1.5"
-                >
-                  <Send className="w-4 h-4 text-slate-400" />
-                  SMS Outbox
-                </Link>
-              </nav>
-
-              {/* Quick Actions */}
-              <div className="flex items-center gap-2">
-                <Link
-                  href="/mothers/new"
-                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-lg shadow-sm transition active:scale-95"
-                >
-                  + Register Mother
-                </Link>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+          rel="stylesheet"
+        />
+        <link
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+        />
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+        />
+      </head>
+      <body>
+        {/* Hospital & Clinician Top Strip */}
+        <header className="clinic-header d-flex justify-content-between align-items-center">
+          <div className="d-flex align-items-center gap-3">
+            <div className="d-flex align-items-center gap-2">
+              <i className="bi bi-heart-pulse fs-3" style={{ color: "var(--app-primary)" }}></i>
+              <div>
+                <span className="fw-bold fs-6 tracking-tight d-block text-dark">
+                  Maternal &amp; Newborn Care
+                </span>
+                <small className="text-secondary">Wolkite &amp; Jimma Primary Health Program</small>
               </div>
             </div>
+            <div className="vr mx-2 d-none d-md-block text-muted"></div>
+            <span className="badge bg-light text-dark border d-none d-md-inline-flex align-items-center gap-1 px-2 py-1">
+              <i className="bi bi-geo-alt" style={{ color: "var(--app-primary)" }}></i> Wolkite Health Center
+            </span>
+          </div>
+
+          <div className="d-flex align-items-center gap-3">
+            <span className="text-secondary small d-none d-sm-inline">
+              <i className="bi bi-broadcast text-success me-1"></i> SMS Gateway:{" "}
+              <strong>AfroMessage Ready</strong>
+            </span>
+            <Link href="/participants/new" className="btn-medical shadow-sm">
+              <i className="bi bi-person-plus-fill"></i> Register Mother
+            </Link>
           </div>
         </header>
 
-        {/* Main Content Area */}
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {children}
-        </main>
+        {/* Main Navigation Bar */}
+        <NavLinks />
 
-        {/* Clinical Privacy & Protocol Footer */}
-        <footer className="bg-white border-t border-slate-200 py-4 text-xs text-slate-500">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-teal-700" />
-              <span>
-                <strong>Confidential Clinical System:</strong> Automated SMS text never discloses patient names or sensitive diagnoses due to shared household phones.
-              </span>
+        {/* Content Workspace */}
+        <main className="container-fluid px-4 py-4 flex-grow-1">{children}</main>
+
+        {/* Clinician Footer */}
+        <footer className="bg-white border-top py-3 text-secondary small text-center mt-auto">
+          <div className="container-fluid px-4 d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
+            <div>
+              <strong>Automated Maternal &amp; Newborn SMS System</strong> &bull; Jimma &amp; Wolkite Clinical Model
             </div>
-            <div className="text-slate-400">
-              AfroMessage Gateway • Ethiopian Calendar (ዓ.ም.) • Jimma RCT Protocol
+            <div>
+              <span className="text-muted">
+                Ethio Telecom &amp; Safaricom routing &bull; UCS-2 Ge&apos;ez safe &bull; Patient phone privacy compliant
+              </span>
             </div>
           </div>
         </footer>

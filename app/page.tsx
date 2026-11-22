@@ -1,20 +1,5 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import {
-  Users,
-  Baby,
-  Send,
-  CheckCircle2,
-  AlertTriangle,
-  ArrowRight,
-  Clock,
-  ShieldCheck,
-  CalendarCheck,
-  Radio,
-  XCircle,
-  HelpCircle,
-  Sparkles,
-} from "lucide-react";
 import { SyncSchedulerButton } from "@/components/SyncSchedulerButton";
 
 export const dynamic = "force-dynamic";
@@ -25,25 +10,22 @@ export default async function DashboardPage() {
 
   // Aggregate clinical stats
   const [
-    totalPregnant,
-    totalPostnatal,
-    totalCompleted,
+    activePregnant,
+    activePostnatal,
+    completed,
     totalEnrolled,
-    optedOutCount,
+    scheduledAppointments,
+    missedAppointmentsList,
+    optedOut,
     lossCount,
-    scheduledCount,
-    missedAppointments,
-    totalDispatched,
-    deliveredCount,
-    todaySentCount,
+    totalSms,
+    sentSms,
     recentMessages,
   ] = await Promise.all([
     prisma.participant.count({ where: { status: "active_pregnant" } }),
     prisma.participant.count({ where: { status: "postnatal" } }),
     prisma.participant.count({ where: { status: "completed" } }),
     prisma.participant.count(),
-    prisma.participant.count({ where: { status: "opted_out" } }),
-    prisma.participant.count({ where: { status: "loss" } }),
     prisma.appointment.count({ where: { status: "scheduled", scheduledFor: { gte: startOfToday } } }),
     prisma.appointment.findMany({
       where: {
@@ -54,431 +36,371 @@ export default async function DashboardPage() {
       },
       include: {
         participant: {
-          include: { phones: { where: { isPrimary: true } }, facility: true },
+          include: { phones: { where: { isPrimary: true } } },
         },
       },
-      take: 6,
     }),
+    prisma.participant.count({ where: { status: "opted_out" } }),
+    prisma.participant.count({ where: { status: "loss" } }),
     prisma.outboxMessage.count(),
     prisma.outboxMessage.count({ where: { status: { in: ["delivered", "sent", "submitted"] } } }),
-    prisma.outboxMessage.count({
-      where: { sentAt: { gte: startOfToday } },
-    }),
     prisma.outboxMessage.findMany({
       take: 8,
       orderBy: { scheduledAt: "desc" },
       include: {
         participant: {
-          include: { facility: true, phones: { where: { isPrimary: true } } },
+          include: { facility: true },
         },
         phone: true,
-        variant: {
-          include: { template: true },
-        },
-        deliveryEvents: {
-          orderBy: { id: "desc" },
-          take: 1,
-        },
       },
     }),
   ]);
 
-  const deliveryRate = totalDispatched > 0 ? Math.round((deliveredCount / totalDispatched) * 100) : 100;
-  const isLive = process.env.SMS_LIVE === "1";
+  const missedAppointments = missedAppointmentsList.length;
+  const deliverySuccessRate = totalSms > 0 ? Math.round((sentSms / totalSms) * 100) : 100;
 
   return (
-    <div className="space-y-8">
+    <>
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            Today's Clinic & Messaging Overview
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h3 className="fw-bold mb-1 text-slate-900">Today&apos;s Clinic &amp; Messaging Overview</h3>
+          <p className="text-secondary mb-0 small">
             Monitoring registered mothers, appointment attendance, and automated prenatal/postnatal SMS streams.
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="d-flex gap-2">
           <SyncSchedulerButton />
-          <Link
-            href="/mothers/new"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm shadow-sm transition active:scale-95"
-          >
-            <Users className="w-4 h-4" />
-            + Register New Mother
+          <Link href="/participants/new" className="btn-medical btn-sm shadow-sm">
+            <i className="bi bi-person-plus-fill"></i> Register New Mother
           </Link>
         </div>
       </div>
 
       {/* Immediate Clinical Action Banner (Triage) */}
-      {missedAppointments.length > 0 && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50/80 p-5 shadow-xs">
-          <div className="flex items-start gap-4">
-            <div className="p-2.5 bg-amber-100 rounded-xl text-amber-700 shrink-0">
-              <AlertTriangle className="w-5 h-5" />
+      {missedAppointments > 0 && (
+        <div className="action-banner danger shadow-sm">
+          <div className="d-flex align-items-center gap-3">
+            <div
+              className="rounded-circle bg-danger bg-opacity-10 p-2 text-danger fs-5 d-flex align-items-center justify-content-center"
+              style={{ width: "40px", height: "40px" }}
+            >
+              <i className="bi bi-exclamation-triangle-fill"></i>
             </div>
-            <div className="flex-1">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div>
-                  <h3 className="text-base font-bold text-amber-950">
-                    {missedAppointments.length} Mother{missedAppointments.length > 1 ? "s" : ""} Missed Scheduled Appointments
-                  </h3>
-                  <p className="text-xs text-amber-800 mt-0.5">
-                    The system triggers automatic follow-up SMS. Please review missed visits and contact the mother to reschedule.
-                  </p>
-                </div>
-                <Link
-                  href="/visits?filter=missed"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs shrink-0 transition"
-                >
-                  Review Missed Visits <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
+            <div>
+              <div className="fw-bold">
+                {missedAppointments} Mother{missedAppointments > 1 ? "s" : ""} Missed Scheduled Appointments
               </div>
-
-              <div className="mt-3.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                {missedAppointments.map((apt) => (
-                  <div
-                    key={apt.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-white border border-amber-200/80 text-xs shadow-xs"
-                  >
-                    <div>
-                      <span className="font-semibold text-slate-900 block">
-                        {apt.participant.fullName}
-                      </span>
-                      <span className="text-[11px] text-slate-500">
-                        {apt.kind.toUpperCase()} • {apt.participant.facility.name} • {apt.participant.phones[0]?.numberE164 || "No phone"}
-                      </span>
-                    </div>
-                    <Link
-                      href={`/mothers/${apt.participant.id}`}
-                      className="px-2 py-1 text-[11px] font-semibold text-amber-800 bg-amber-100/70 hover:bg-amber-200/80 rounded transition"
-                    >
-                      Follow up
-                    </Link>
-                  </div>
-                ))}
+              <div className="small">
+                The system sent an automatic rescheduling SMS. Please review and call to arrange a new visit date.
               </div>
             </div>
           </div>
+          <Link href="/appointments?filter=missed" className="btn btn-sm btn-danger fw-semibold px-3 text-nowrap">
+            Review Missed Visits <i className="bi bi-arrow-right ms-1"></i>
+          </Link>
         </div>
       )}
 
-      {/* Primary Clinical KPI Metrics Row (4 Cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Metric 1: Active Pregnancies */}
-        <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Active Pregnancies
-              </span>
-              <h2 className="text-3xl font-extrabold text-slate-900 mt-2">{totalPregnant}</h2>
+      {/* Primary Clinical Metrics Row */}
+      <div className="row g-3 mb-4">
+        {/* Active Pregnancies */}
+        <div className="col-xl-3 col-md-6">
+          <div className="card-custom p-3 h-100 d-flex flex-column justify-content-between">
+            <div className="d-flex justify-content-between align-items-start">
+              <div>
+                <span className="text-secondary small fw-semibold text-uppercase tracking-wider">
+                  Active Pregnancies
+                </span>
+                <h2 className="fw-bold text-slate-900 mt-2 mb-0">{activePregnant}</h2>
+              </div>
+              <div
+                className="rounded-3 p-2"
+                style={{ backgroundColor: "var(--app-primary-light)", color: "var(--app-primary)" }}
+              >
+                <i className="bi bi-person-heart fs-4"></i>
+              </div>
             </div>
-            <div className="w-11 h-11 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center">
-              <Users className="w-5 h-5" />
+            <div className="mt-3 pt-2 border-top d-flex align-items-center justify-content-between text-secondary small">
+              <span>Receiving prenatal SMS</span>
+              <Link
+                href="/participants?status=active_pregnant"
+                className="text-decoration-none fw-semibold"
+                style={{ color: "var(--app-primary)" }}
+              >
+                View list &rarr;
+              </Link>
             </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500">Receiving prenatal SMS</span>
-            <Link
-              href="/mothers?status=active_pregnant"
-              className="font-semibold text-teal-600 hover:text-teal-700 flex items-center gap-0.5"
-            >
-              View list &rarr;
-            </Link>
           </div>
         </div>
 
-        {/* Metric 2: Postnatal Mothers */}
-        <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Postnatal Care (0–6 Wks)
-              </span>
-              <h2 className="text-3xl font-extrabold text-slate-900 mt-2">{totalPostnatal}</h2>
+        {/* Postnatal Mothers */}
+        <div className="col-xl-3 col-md-6">
+          <div className="card-custom p-3 h-100 d-flex flex-column justify-content-between">
+            <div className="d-flex justify-content-between align-items-start">
+              <div>
+                <span className="text-secondary small fw-semibold text-uppercase tracking-wider">
+                  Postnatal Care (0–6 Wks)
+                </span>
+                <h2 className="fw-bold text-slate-900 mt-2 mb-0">{activePostnatal}</h2>
+              </div>
+              <div
+                className="rounded-3 p-2"
+                style={{ backgroundColor: "var(--app-success-light)", color: "var(--app-success)" }}
+              >
+                <i className="bi bi-flower1 fs-4"></i>
+              </div>
             </div>
-            <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-              <Baby className="w-5 h-5" />
+            <div className="mt-3 pt-2 border-top d-flex align-items-center justify-content-between text-secondary small">
+              <span>Newborn immunization stream</span>
+              <Link href="/participants?status=postnatal" className="text-decoration-none fw-semibold text-success">
+                View list &rarr;
+              </Link>
             </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500">Newborn immunization stream</span>
-            <Link
-              href="/mothers?status=postnatal"
-              className="font-semibold text-purple-600 hover:text-purple-700 flex items-center gap-0.5"
-            >
-              View list &rarr;
-            </Link>
           </div>
         </div>
 
-        {/* Metric 3: Upcoming ANC Visits */}
-        <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Upcoming ANC Visits
-              </span>
-              <h2 className="text-3xl font-extrabold text-slate-900 mt-2">{scheduledCount}</h2>
+        {/* Today & Upcoming Visits */}
+        <div className="col-xl-3 col-md-6">
+          <div className="card-custom p-3 h-100 d-flex flex-column justify-content-between">
+            <div className="d-flex justify-content-between align-items-start">
+              <div>
+                <span className="text-secondary small fw-semibold text-uppercase tracking-wider">
+                  Upcoming ANC Visits
+                </span>
+                <h2 className="fw-bold text-slate-900 mt-2 mb-0">{scheduledAppointments}</h2>
+              </div>
+              <div
+                className="rounded-3 p-2"
+                style={{ backgroundColor: "var(--app-info-light)", color: "var(--app-info)" }}
+              >
+                <i className="bi bi-calendar-check fs-4"></i>
+              </div>
             </div>
-            <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <CalendarCheck className="w-5 h-5" />
+            <div className="mt-3 pt-2 border-top d-flex align-items-center justify-content-between text-secondary small">
+              <span>72h advance reminders active</span>
+              <Link href="/appointments?filter=scheduled" className="text-decoration-none fw-semibold text-info">
+                View visits &rarr;
+              </Link>
             </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500">72h advance reminders active</span>
-            <Link
-              href="/visits?filter=upcoming"
-              className="font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-0.5"
-            >
-              View visits &rarr;
-            </Link>
           </div>
         </div>
 
-        {/* Metric 4: Graduated Cohort */}
-        <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Graduated Cohort
-              </span>
-              <h2 className="text-3xl font-extrabold text-slate-900 mt-2">{totalCompleted}</h2>
+        {/* Completed Program */}
+        <div className="col-xl-3 col-md-6">
+          <div className="card-custom p-3 h-100 d-flex flex-column justify-content-between">
+            <div className="d-flex justify-content-between align-items-start">
+              <div>
+                <span className="text-secondary small fw-semibold text-uppercase tracking-wider">
+                  Graduated Cohort
+                </span>
+                <h2 className="fw-bold text-slate-900 mt-2 mb-0">{completed}</h2>
+              </div>
+              <div className="rounded-3 bg-light p-2 text-secondary">
+                <i className="bi bi-shield-check fs-4"></i>
+              </div>
             </div>
-            <div className="w-11 h-11 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-              <ShieldCheck className="w-5 h-5" />
+            <div className="mt-3 pt-2 border-top d-flex align-items-center justify-content-between text-secondary small">
+              <span>Completed full 6-week care</span>
+              <span className="text-muted">{totalEnrolled} Total Enrolled</span>
             </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500">Completed full 6-week care</span>
-            <span className="text-slate-400 font-medium">{totalEnrolled} Total Enrolled</span>
           </div>
         </div>
       </div>
 
-      {/* Middle Section: Automated SMS Delivery Health & Program Safety */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column (2 Cols): Automated SMS Delivery Health */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-slate-100">
-            <div>
-              <div className="flex items-center gap-2">
-                <Radio className="w-4 h-4 text-teal-600 animate-pulse" />
-                <h3 className="font-bold text-slate-900 text-base">
+      {/* Middle Section: Delivery Performance & Telephony Status */}
+      <div className="row g-3 mb-4">
+        {/* Messaging & Delivery Status Card */}
+        <div className="col-lg-8">
+          <div className="card-custom p-4 h-100">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h5 className="fw-bold mb-1">
+                  <i className="bi bi-broadcast me-2" style={{ color: "var(--app-primary)" }}></i>
                   Automated SMS Delivery Health
-                </h3>
+                </h5>
+                <small className="text-secondary">
+                  Connected to Ethio Telecom &amp; Safaricom routes through AfroMessage Gateway
+                </small>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Connected to Ethio Telecom & Safaricom routes through AfroMessage Gateway
-              </p>
-            </div>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              {isLive ? "Gateway Online (Live)" : "Gateway Active (Sandbox)"}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 text-center">
-              <span className="text-xs font-medium text-slate-500">Messages Dispatched</span>
-              <div className="text-2xl font-extrabold text-slate-900 mt-1">{totalDispatched}</div>
-              <span className="text-[11px] text-slate-400">Total automated SMS</span>
-            </div>
-
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 text-center">
-              <span className="text-xs font-medium text-slate-500">Successfully Delivered</span>
-              <div className="text-2xl font-extrabold text-emerald-600 mt-1">{deliveredCount}</div>
-              <span className="text-[11px] text-slate-400">Confirmed by network</span>
-            </div>
-
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 text-center">
-              <span className="text-xs font-medium text-slate-500">Delivery Rate</span>
-              <div className="text-2xl font-extrabold text-teal-600 mt-1">{deliveryRate}%</div>
-              <span className="text-[11px] text-slate-400">Jimma trial target: &gt;95%</span>
-            </div>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-slate-600">
-              <Clock className="w-4 h-4 text-teal-600 shrink-0" />
-              <span>
-                Preferred sending windows: <strong>8:00 AM – 10:00 AM</strong> and <strong>7:00 PM</strong> (Addis Ababa Time).
+              <span className="badge bg-success-subtle text-success border border-success-subtle px-3 py-1">
+                <i className="bi bi-circle-fill me-1 text-success" style={{ fontSize: "0.5rem" }}></i> Gateway Online
               </span>
             </div>
-            <Link
-              href="/activity"
-              className="text-xs font-semibold text-teal-700 hover:text-teal-800 shrink-0 hover:underline"
-            >
-              View Outbox Details &rarr;
-            </Link>
+
+            <div className="row g-3 my-1">
+              <div className="col-sm-4">
+                <div className="p-3 rounded border bg-light text-center">
+                  <div className="text-secondary small fw-medium">Messages Dispatched</div>
+                  <div className="fs-3 fw-bold text-slate-900 mt-1">{totalSms}</div>
+                  <div className="text-muted small">Total automated SMS</div>
+                </div>
+              </div>
+              <div className="col-sm-4">
+                <div className="p-3 rounded border bg-light text-center">
+                  <div className="text-secondary small fw-medium">Successfully Delivered</div>
+                  <div className="fs-3 fw-bold text-success mt-1">{sentSms}</div>
+                  <div className="text-muted small">Confirmed by network</div>
+                </div>
+              </div>
+              <div className="col-sm-4">
+                <div className="p-3 rounded border bg-light text-center">
+                  <div className="text-secondary small fw-medium">Delivery Rate</div>
+                  <div className="fs-3 fw-bold text-primary mt-1">{deliverySuccessRate}%</div>
+                  <div className="text-muted small">Jimma trial target: &gt;95%</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 p-3 rounded bg-light border d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2">
+              <div className="small text-secondary">
+                <i className="bi bi-clock-history me-1" style={{ color: "var(--app-primary)" }}></i>
+                Preferred sending windows: <strong>8:00 AM – 10:00 AM</strong> and <strong>7:00 PM</strong> (Addis Ababa
+                Time).
+              </div>
+              <Link href="/outbox" className="btn btn-sm btn-outline-secondary text-nowrap">
+                View Outbox Details
+              </Link>
+            </div>
           </div>
         </div>
 
-        {/* Right Column: Program Safety & Privacy */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-            <ShieldCheck className="w-5 h-5 text-teal-600" />
-            <h3 className="font-bold text-slate-900 text-base">
-              Program Safety & Privacy
-            </h3>
-          </div>
-
-          <ul className="divide-y divide-slate-100 text-xs">
-            <li className="py-3 flex items-center justify-between">
-              <div>
-                <span className="font-semibold text-slate-900 block">Shared Phone Protection</span>
-                <span className="text-slate-500 text-[11px]">No PII or diagnosis in SMS body</span>
-              </div>
-              <span className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Active
-              </span>
-            </li>
-
-            <li className="py-3 flex items-center justify-between">
-              <div>
-                <span className="font-semibold text-slate-900 block">Opt-Out Requests</span>
-                <span className="text-slate-500 text-[11px]">Mothers replied STOP / አቁም</span>
-              </div>
-              <span className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                {optedOutCount}
-              </span>
-            </li>
-
-            <li className="py-3 flex items-center justify-between">
-              <div>
-                <span className="font-semibold text-slate-900 block">Sensitive Branch Flags</span>
-                <span className="text-slate-500 text-[11px]">Immediate halt on pregnancy loss</span>
-              </div>
-              <span className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-                {lossCount}
-              </span>
-            </li>
-          </ul>
-
-          <div className="pt-2 text-[11px] text-slate-400 border-t border-slate-100 leading-relaxed">
-            All messages comply with Wolkite University Clinical Institutional Review Board (IRB) ethical requirements.
+        {/* Clinical Safety & Program Compliance */}
+        <div className="col-lg-4">
+          <div className="card-custom p-4 h-100">
+            <h5 className="fw-bold mb-3">
+              <i className="bi bi-shield-shaded me-2" style={{ color: "var(--app-primary)" }}></i>
+              Program Safety &amp; Privacy
+            </h5>
+            <ul className="list-unstyled mb-0">
+              <li className="d-flex justify-content-between align-items-center py-2 border-bottom">
+                <div>
+                  <div className="fw-semibold text-slate-900 small">Shared Phone Protection</div>
+                  <small className="text-secondary">No PII or diagnosis in SMS body</small>
+                </div>
+                <span className="badge bg-light text-success border">
+                  <i className="bi bi-check-lg"></i> Active
+                </span>
+              </li>
+              <li className="d-flex justify-content-between align-items-center py-2 border-bottom">
+                <div>
+                  <div className="fw-semibold text-slate-900 small">Opt-Out Requests</div>
+                  <small className="text-secondary">Mothers replied STOP / አቁም</small>
+                </div>
+                <span className="badge bg-light text-dark border">{optedOut}</span>
+              </li>
+              <li className="d-flex justify-content-between align-items-center py-2">
+                <div>
+                  <div className="fw-semibold text-slate-900 small">Sensitive Branch Flags</div>
+                  <small className="text-secondary">Immediate halt on pregnancy loss</small>
+                </div>
+                <span className="badge bg-light text-danger border">{lossCount}</span>
+              </li>
+            </ul>
           </div>
         </div>
       </div>
 
-      {/* Recent Automated Messages Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-teal-600" />
-            <h3 className="font-bold text-slate-900 text-base">Recent Automated Messages</h3>
+      {/* Recent Mother Activity Table */}
+      <div className="card-custom overflow-hidden">
+        <div className="card-header-clean">
+          <div className="d-flex align-items-center gap-2">
+            <i className="bi bi-clock-history" style={{ color: "var(--app-primary)" }}></i>
+            <span>Recent Automated Messages</span>
           </div>
-          <Link
-            href="/activity"
-            className="text-xs font-semibold text-teal-600 hover:text-teal-700"
-          >
-            See all messages &rarr;
+          <Link href="/outbox" className="btn btn-sm btn-outline-secondary">
+            See all messages
           </Link>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-600">
-            <thead className="bg-slate-50 border-b border-slate-200 uppercase font-semibold text-slate-500 tracking-wider">
+        <div className="table-responsive">
+          <table className="table table-custom">
+            <thead>
               <tr>
-                <th className="px-6 py-3.5">Mother</th>
-                <th className="px-6 py-3.5">Facility & Phone</th>
-                <th className="px-6 py-3.5">Message Sent</th>
-                <th className="px-6 py-3.5">Encoding & Segments</th>
-                <th className="px-6 py-3.5">Delivery Status</th>
-                <th className="px-6 py-3.5">Scheduled For</th>
+                <th>Mother</th>
+                <th>Facility &amp; Phone</th>
+                <th>Message Sent</th>
+                <th>Encoding &amp; Segments</th>
+                <th>Delivery Status</th>
+                <th>Scheduled For</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {recentMessages.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-slate-400">
-                    No recent automated message activity. Enrolled mothers will have scheduled SMS appear here.
+                  <td colSpan={6} className="text-center text-muted py-5">
+                    No recent outbox activity. Register a mother to initiate automated scheduling.
                   </td>
                 </tr>
               ) : (
-                recentMessages.map((msg) => {
-                  const primaryPhone = msg.participant?.phones[0] || msg.phone;
-                  return (
-                    <tr key={msg.id} className="hover:bg-slate-50/70 transition">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-teal-50 text-teal-700 font-bold text-xs flex items-center justify-center shrink-0">
-                            {msg.participant?.fullName?.charAt(0) || "M"}
-                          </div>
-                          <div>
-                            <Link
-                              href={`/mothers/${msg.participant?.id}`}
-                              className="font-bold text-slate-900 hover:text-teal-700 block text-xs"
-                            >
-                              {msg.participant?.fullName || "Mother"}
-                            </Link>
-                            <span className="text-[11px] font-mono text-slate-400">
-                              {msg.participant?.publicCode}
-                            </span>
-                          </div>
+                recentMessages.map((msg) => (
+                  <tr key={msg.id}>
+                    <td>
+                      <div className="d-flex align-items-center gap-2">
+                        <div className="patient-avatar">
+                          {msg.participant.fullName ? msg.participant.fullName.slice(0, 1) : "M"}
                         </div>
-                      </td>
-
-                      <td className="px-6 py-4">
-                        <span className="font-semibold text-slate-800 block">
-                          {msg.participant?.facility?.name || "Health Center"}
+                        <div>
+                          <Link
+                            href={`/participants/${msg.participant.id}`}
+                            className="fw-bold text-decoration-none text-dark d-block"
+                          >
+                            {msg.participant.fullName}
+                          </Link>
+                          <span className="text-muted small">{msg.participant.publicCode}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="small fw-semibold text-dark">{msg.participant.facility.name}</div>
+                      <small className="text-secondary">
+                        {msg.phone?.numberE164} ({msg.phone?.ownerType ? msg.phone.ownerType.charAt(0).toUpperCase() + msg.phone.ownerType.slice(1) : "Self"})
+                      </small>
+                    </td>
+                    <td style={{ maxWidth: "380px" }}>
+                      <div className="small text-truncate" title={msg.messageContent}>
+                        {msg.messageContent}
+                      </div>
+                    </td>
+                    <td>
+                      <span className="badge bg-light text-dark border small">
+                        {msg.segments} segment{msg.segments > 1 ? "s" : ""}
+                      </span>
+                    </td>
+                    <td>
+                      {msg.status === "sent" || msg.status === "delivered" || msg.status === "submitted" ? (
+                        <span className="badge-clinical postnatal">
+                          <i className="bi bi-check2"></i> Delivered
                         </span>
-                        <span className="text-[11px] text-slate-500">
-                          {primaryPhone?.numberE164 || "N/A"}{" "}
-                          <span className="capitalize">({primaryPhone?.ownerType || "self"})</span>
+                      ) : msg.status === "pending" || msg.status === "queued" ? (
+                        <span className="badge-clinical opted-out">
+                          <i className="bi bi-hourglass-split"></i> Queued
                         </span>
-                      </td>
-
-                      <td className="px-6 py-4 max-w-sm">
-                        <p className="line-clamp-2 text-slate-700 font-sans" title={msg.messageContent}>
-                          {msg.messageContent}
-                        </p>
-                      </td>
-
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
-                          {msg.segments} segment{msg.segments > 1 ? "s" : ""} (UCS-2)
+                      ) : msg.status === "cancelled" ? (
+                        <span className="badge-clinical completed">
+                          <i className="bi bi-dash-circle"></i> Cancelled
                         </span>
-                      </td>
-
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold capitalize ${
-                            msg.deliveryEvents[0]?.mappedStatus === "delivered" || msg.status === "delivered"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : msg.status === "sent" || msg.status === "submitted"
-                              ? "bg-blue-50 text-blue-700 border border-blue-200"
-                              : msg.status === "pending" || msg.status === "queued"
-                              ? "bg-amber-50 text-amber-700 border border-amber-200"
-                              : msg.status === "cancelled"
-                              ? "bg-slate-100 text-slate-600 border border-slate-200"
-                              : "bg-rose-50 text-rose-700 border border-rose-200"
-                          }`}
-                        >
-                          {msg.deliveryEvents[0]?.mappedStatus === "delivered" || msg.status === "delivered" ? (
-                            <CheckCircle2 className="w-3 h-3" />
-                          ) : null}
-                          {msg.deliveryEvents[0]?.mappedStatus || msg.status}
+                      ) : (
+                        <span className="badge-clinical missed">
+                          <i className="bi bi-x-circle"></i> Failed
                         </span>
-                      </td>
-
-                      <td className="px-6 py-4 text-slate-500 text-[11px]">
-                        {new Date(msg.scheduledAt).toLocaleString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </td>
-                    </tr>
-                  );
-                })
+                      )}
+                    </td>
+                    <td className="text-secondary small">
+                      {new Date(msg.scheduledAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
       </div>
-    </div>
+    </>
   );
 }
