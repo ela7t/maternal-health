@@ -1,0 +1,166 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Facility {
+  id           Int           @id @default(autoincrement())
+  name         String
+  code         String        @unique
+  woreda       String
+  zone         String
+  phone        String?
+  participants Participant[]
+  users        User[]
+}
+
+model User {
+  id         Int       @id @default(autoincrement())
+  username   String    @unique
+  email      String    @unique
+  password   String
+  fullName   String
+  role       String    @default("MIDWIFE") // ADMIN, MIDWIFE, SUPERVISOR, RESEARCHER
+  facilityId Int?
+  facility   Facility? @relation(fields: [facilityId], references: [id])
+  createdAt  DateTime  @default(now())
+}
+
+model Participant {
+  id                Int                @id @default(autoincrement())
+  publicCode        String             @unique // e.g., MOM-A8B9C1
+  fullName          String
+  dateOfBirth       DateTime?
+  kebele            String
+  facilityId        Int
+  facility          Facility           @relation(fields: [facilityId], references: [id])
+  studyArm          String             @default("intervention_gain") // intervention_gain, intervention_loss, control
+  preferredLanguage String             @default("am") // am, en, gurage
+  status            String             @default("active_pregnant") // active_pregnant, postnatal, completed, opted_out, loss
+  consentRecordedBy String
+  enrolledAt        DateTime           @default(now())
+  phones            ParticipantPhone[]
+  pregnancies       Pregnancy[]
+  appointments      Appointment[]
+  outboxMessages    OutboxMessage[]
+  optOuts           OptOut[]
+}
+
+model ParticipantPhone {
+  id            Int             @id @default(autoincrement())
+  participantId Int
+  participant   Participant     @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  numberE164    String // e.g. +251911223344
+  phoneHash     String // SHA-256 for privacy lookup
+  isPrimary     Boolean         @default(true)
+  ownerType     String          @default("self") // self, spouse, relative, other
+  failureCount  Int             @default(0)
+  outboxMessages OutboxMessage[]
+}
+
+model Pregnancy {
+  id            Int         @id @default(autoincrement())
+  participantId Int
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  lmpDate       DateTime?
+  eddDate       DateTime
+  datingMethod  String      @default("lmp") // lmp, ultrasound, fundal_height
+  riskStatus    String      @default("low") // low, high
+  outcome       String      @default("ongoing") // ongoing, live_birth, stillbirth, miscarriage
+  deliveredAt   DateTime?
+  deliveryPlace String?
+  babies        Baby[]
+}
+
+model Baby {
+  id          Int       @id @default(autoincrement())
+  pregnancyId Int
+  pregnancy   Pregnancy @relation(fields: [pregnancyId], references: [id], onDelete: Cascade)
+  babyCode    String    @unique
+  name        String?
+  dateOfBirth DateTime
+  status      String    @default("alive")
+}
+
+model Appointment {
+  id                Int          @id @default(autoincrement())
+  participantId     Int
+  participant       Participant  @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  kind              String       @default("anc") // anc, pnc
+  scheduledFor      DateTime
+  status            String       @default("scheduled") // scheduled, attended, missed, rescheduled, cancelled
+  recordedBy        String?
+  rescheduledFromId Int?
+  notes             String?
+  createdAt         DateTime     @default(now())
+}
+
+model MessageTemplate {
+  id             Int               @id @default(autoincrement())
+  code           String            @unique
+  stream         String // educational, anc_reminder, pnc_reminder, reschedule, supportive
+  topic          String
+  gaFromWeeks    Int?
+  gaToWeeks      Int?
+  pncDayFrom     Int?
+  pncDayTo       Int?
+  riskFilter     String?
+  approvalStatus String            @default("approved")
+  variants       TemplateVariant[]
+}
+
+model TemplateVariant {
+  id             Int             @id @default(autoincrement())
+  templateId     Int
+  template       MessageTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  language       String          @default("am")
+  framing        String          @default("gain") // gain, loss, neutral
+  body           String
+  segmentCount   Int             @default(1)
+  outboxMessages OutboxMessage[]
+}
+
+model OutboxMessage {
+  id             Int              @id @default(autoincrement())
+  participantId  Int
+  participant    Participant      @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  phoneId        Int
+  phone          ParticipantPhone @relation(fields: [phoneId], references: [id])
+  variantId      Int?
+  variant        TemplateVariant? @relation(fields: [variantId], references: [id])
+  idempotencyKey String           @unique
+  scheduledAt    DateTime
+  status         String           @default("pending") // pending, queued, submitted, sent, delivered, failed, cancelled
+  attempts       Int              @default(0)
+  gatewayMsgId   String?
+  callbackToken  String           @unique
+  segments       Int              @default(1)
+  messageContent String
+  sentAt         DateTime?
+  deliveredAt    DateTime?
+  failureReason  String?
+  deliveryEvents DeliveryEvent[]
+}
+
+model DeliveryEvent {
+  id           Int           @id @default(autoincrement())
+  outboxId     Int
+  outbox       OutboxMessage @relation(fields: [outboxId], references: [id], onDelete: Cascade)
+  rawStatus    String
+  mappedStatus String
+  rawPayload   Json
+  receivedAt   DateTime      @default(now())
+}
+
+model OptOut {
+  id            Int         @id @default(autoincrement())
+  participantId Int
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  source        String      @default("sms_reply")
+  reason        String?
+  optedOutAt    DateTime    @default(now())
+}

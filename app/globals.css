@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom clinical styles */
+.badge-t1 {
+  background-color: #e0f2fe;
+  color: #0369a1;
+  border-color: #bae6fd;
+}
+
+.badge-t2 {
+  background-color: #ccfbf1;
+  color: #0f766e;
+  border-color: #99f6e4;
+}
+
+.badge-t3 {
+  background-color: #fef3c7;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.badge-postnatal {
+  background-color: #ede9fe;
+  color: #6d28d9;
+  border-color: #ddd6fe;
+}
