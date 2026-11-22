@@ -17,10 +17,10 @@ export async function sendSms(
   callbackToken?: string
 ): Promise<SmsSendResult> {
   const isLive = process.env.SMS_LIVE === "1";
-  const baseUrl = process.env.AFROMESSAGE_BASE_URL || "https://api.afromessage.com/api";
-  const token = process.env.AFROMESSAGE_TOKEN || "";
-  const identifierId = process.env.AFROMESSAGE_IDENTIFIER_ID || "";
-  const senderName = process.env.AFROMESSAGE_SENDER_NAME || "";
+  const baseUrl = process.env.AFROMESSAGE_BASE_URL || process.env.AFRO_BASE_URL || "https://api.afromessage.com/api";
+  const token = process.env.AFROMESSAGE_TOKEN || process.env.AFRO_API_KEY || "";
+  const identifierId = process.env.AFROMESSAGE_IDENTIFIER_ID || process.env.AFRO_IDENTIFIER_ID || "";
+  const senderName = process.env.AFROMESSAGE_SENDER_NAME || process.env.AFRO_SENDER_NAME || "";
   const callbackBase = process.env.CALLBACK_BASE_URL || "";
 
   // Normalize recipient to E.164
