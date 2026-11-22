@@ -37,7 +37,7 @@ services:
     name: mnh-sms-scheduler
     env: docker
     schedule: "*/15 * * * *"
-    command: php bin/console app:scheduler:run
+    dockerCommand: php bin/console app:scheduler:run
     plan: starter
     envVars:
       - key: APP_ENV
