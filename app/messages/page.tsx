@@ -3,12 +3,11 @@
 import { useState, useEffect } from "react";
 import {
   BookOpenText,
-  Sparkles,
   Calculator,
-  Layers,
-  Coins,
   CheckCircle2,
   Copy,
+  Check,
+  Radio,
   Search,
 } from "lucide-react";
 import { calculateSmsSegments } from "@/lib/sms/ucs2-segment-counter";
@@ -32,13 +31,14 @@ interface Template {
 export default function MessageBankPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
   const [selectedStage, setSelectedStage] = useState("all");
 
   // Simulator State
   const [composerText, setComposerText] = useState(
-    "ሰላም! ጤናዎ እንዲጠበቅ እና ፅንሱ በጥሩ ሁኔታ እንዲያድግ የቅድመ ወሊድ ክትትልዎን ያድርጉ።"
+    "ጤና ይስጥልኝ! በእርግዝና ወቅት የተመጣጠነ ምግብ መመገብ እርስዎና ፅንሱ ጤናማ እንድትሆኑ ይረዳል።"
   );
-  const [copied, setCopied] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const billingInfo = calculateSmsSegments(composerText);
 
@@ -59,199 +59,231 @@ export default function MessageBankPage() {
     }
   }
 
-  function handleCopy(text: string) {
-    navigator.clipboard.writeText(text);
+  function handleLoadIntoCalculator(text: string, id: string) {
     setComposerText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
   }
+
+  const filteredTemplates = templates.filter((tpl) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase().trim();
+    return (
+      tpl.templateCode.toLowerCase().includes(q) ||
+      (tpl.description && tpl.description.toLowerCase().includes(q)) ||
+      tpl.variants.some((v) => v.messageContent.toLowerCase().includes(q))
+    );
+  });
+
+  const progressLimit = billingInfo.encoding === "UCS-2" ? 70 : 160;
+  const progressPct = Math.min(100, Math.round((billingInfo.charCount / progressLimit) * 100));
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-          Clinical Message Bank & UCS-2 Billing Simulator
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">
-          78 validated messages from Jimma RCT protocol with Gain vs Loss framing & AfroMessage billing optimization.
-        </p>
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            MNH Clinical Message Bank & Framing
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Validated Jimma Zone 78-message repository aligned with the WHO 8-contact ANC model and Ge&apos;ez UCS-2 segment limits.
+          </p>
+        </div>
+        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold shrink-0">
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+          Clinically Approved
+        </span>
       </div>
 
-      {/* Live UCS-2 Segment Billing Simulator Widget */}
-      <div className="bg-white rounded-2xl border border-teal-200 shadow-sm p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+      {/* Interactive Ge'ez / Amharic SMS Length & Billing Meter */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
+        <div>
+          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <Calculator className="w-5 h-5 text-teal-600" />
-            <h2 className="text-base font-bold text-slate-900">
-              Interactive Amharic UCS-2 Segment & Cost Calculator
-            </h2>
-          </div>
-          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
-            AfroMessage Gateway Live Meter
-          </span>
+            Interactive Ge&apos;ez / Amharic SMS Length & Billing Meter
+          </h2>
+          <p className="text-xs text-slate-500 mt-1">
+            Ethio Telecom and Safaricom bill Ge&apos;ez text under <strong>UCS-2 encoding (70 characters per segment)</strong> instead of 160 characters for English. Test any draft below:
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Typing Area */}
+          {/* Text Area */}
           <div className="lg:col-span-2 space-y-2">
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-              Message Text (አማርኛ ወይም እንግሊዝኛ)
-            </label>
             <textarea
               rows={4}
               value={composerText}
               onChange={(e) => setComposerText(e.target.value)}
-              placeholder="Type Amharic Ge'ez or English text to test segment count..."
+              placeholder="Type or paste Amharic / English text here..."
               className="w-full p-3.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 font-sans"
             />
-            <div className="flex justify-between text-xs text-slate-400">
-              <span>Encoding: <strong>{billingInfo.encoding}</strong></span>
-              <span>{copied ? "Copied & loaded!" : "Click any bank message below to test"}</span>
+            {/* Progress Bar */}
+            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+              <div
+                className={`h-full transition-all duration-300 ${
+                  billingInfo.segmentCount > 1 ? "bg-amber-500" : "bg-teal-600"
+                }`}
+                style={{ width: `${progressPct}%` }}
+              ></div>
+            </div>
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span>{copiedId ? "Loaded from message bank!" : "Click 'Test in Meter' on any message below"}</span>
+              <span>{billingInfo.charCount} / {progressLimit} in 1st segment</span>
             </div>
           </div>
 
-          {/* Real-time Billing Breakdown Card */}
-          <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3.5 flex flex-col justify-between">
-            <div>
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-                Billing Summary
-              </span>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-teal-900">
-                  {billingInfo.segmentCount}
-                </span>
-                <span className="text-sm font-semibold text-teal-700">
-                  SMS Segment{billingInfo.segmentCount > 1 ? "s" : ""}
+          {/* Breakdown Card */}
+          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3 flex flex-col justify-between text-xs">
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Encoding Format:</span>
+                <span className="font-bold text-slate-900 px-2 py-0.5 rounded bg-slate-200">
+                  {billingInfo.encoding} {billingInfo.encoding === "UCS-2" ? "(Ge'ez)" : "(GSM-7)"}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                {billingInfo.charCount} characters ({billingInfo.remainingInSegment} left in current segment)
-              </p>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Length:</span>
+                <span className="font-bold text-slate-900">{billingInfo.charCount} characters</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Billable Segments:</span>
+                <span className="font-bold text-emerald-700 px-2 py-0.5 rounded bg-emerald-100">
+                  {billingInfo.segmentCount} Segment{billingInfo.segmentCount > 1 ? "s" : ""}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Remaining in Segment:</span>
+                <span className="font-semibold text-slate-700">{billingInfo.remainingInSegment} chars</span>
+              </div>
             </div>
 
-            <div className="pt-3 border-t border-slate-200 space-y-1.5 text-xs text-slate-600">
-              <div className="flex justify-between">
-                <span>Estimated Cost (ETB):</span>
-                <strong className="text-slate-900">{(billingInfo.segmentCount * 0.20).toFixed(2)} ETB</strong>
-              </div>
-              <div className="flex justify-between text-[11px] text-slate-400">
-                <span>Rate per segment:</span>
-                <span>0.20 ETB</span>
-              </div>
-              <div className="flex justify-between text-[11px] text-slate-400">
-                <span>Ge'ez UCS-2 limit:</span>
-                <span>{billingInfo.segmentCount <= 1 ? "70 chars" : "67 chars/part"}</span>
-              </div>
+            <div className="pt-3 border-t border-slate-200 flex items-center justify-between font-medium">
+              <span className="text-slate-600">Cost (ETB @ 0.20):</span>
+              <span className="text-sm font-bold text-slate-900">
+                {(billingInfo.segmentCount * 0.2).toFixed(2)} ETB
+              </span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Message Bank Browser */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-2">
             <BookOpenText className="w-5 h-5 text-teal-600" />
-            <h2 className="text-lg font-bold text-slate-900">
-              78-Message Protocol Library
-            </h2>
+            <h3 className="font-bold text-slate-900 text-sm">
+              Active Clinical Templates ({filteredTemplates.length})
+            </h3>
           </div>
-
-          <div className="flex items-center gap-2">
-            <select
-              value={selectedStage}
-              onChange={(e) => setSelectedStage(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500"
-            >
-              <option value="all">All Clinical Stages</option>
-              <option value="first_trimester">First Trimester (T1)</option>
-              <option value="second_trimester">Second Trimester (T2)</option>
-              <option value="third_trimester">Third Trimester (T3)</option>
-              <option value="postnatal">Postnatal (Day 1 - 42)</option>
-              <option value="appointment">Appointment Reminders</option>
-            </select>
-          </div>
+          <span className="text-xs text-slate-400">
+            Gain-Framed (Benefits) vs. Loss-Framed (Risk Awareness)
+          </span>
         </div>
 
-        {/* Template Cards */}
-        {loading ? (
-          <div className="p-12 text-center text-slate-400 text-sm">Loading message bank...</div>
-        ) : templates.length === 0 ? (
-          <div className="p-12 text-center text-slate-400 text-sm">
-            No message templates found for this stage.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4">
-            {templates.map((tpl) => (
-              <div
-                key={tpl.id}
-                className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-teal-900 font-mono">
-                      {tpl.templateCode}
-                    </span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-slate-100 text-slate-600">
-                      {tpl.clinicalStage}
-                    </span>
-                  </div>
-                  <span className="text-xs text-slate-400">
-                    Timing offset: <strong>Day {tpl.timingDayOffset}</strong>
-                  </span>
-                </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs text-slate-600">
+            <thead className="bg-slate-50 border-b border-slate-200 uppercase font-semibold text-slate-500 tracking-wider">
+              <tr>
+                <th className="px-6 py-3.5">Template Code & Milestone</th>
+                <th className="px-6 py-3.5">Clinical Topic</th>
+                <th className="px-6 py-3.5">Amharic Gain-Framed (Benefits)</th>
+                <th className="px-6 py-3.5">Amharic Loss-Framed (Cautions)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
+                    Loading message library...
+                  </td>
+                </tr>
+              ) : filteredTemplates.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
+                    No templates found.
+                  </td>
+                </tr>
+              ) : (
+                filteredTemplates.map((tpl) => {
+                  const gainAm = tpl.variants.find((v) => v.languageCode === "am" && v.framingVariant === "gain");
+                  const lossAm = tpl.variants.find((v) => v.languageCode === "am" && v.framingVariant === "loss");
+                  const gainSeg = gainAm ? calculateSmsSegments(gainAm.messageContent).segmentCount : 1;
+                  const lossSeg = lossAm ? calculateSmsSegments(lossAm.messageContent).segmentCount : 1;
 
-                {tpl.description && (
-                  <p className="text-xs text-slate-500">{tpl.description}</p>
-                )}
-
-                {/* Side-by-side Variants: Gain vs Loss */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {tpl.variants.map((v) => (
-                    <div
-                      key={v.id}
-                      className={`p-4 rounded-xl border space-y-2 relative group ${
-                        v.framingVariant === "gain"
-                          ? "bg-emerald-50/40 border-emerald-200"
-                          : "bg-amber-50/40 border-amber-200"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span
-                          className={`text-[11px] font-bold uppercase tracking-wider ${
-                            v.framingVariant === "gain"
-                              ? "text-emerald-800"
-                              : "text-amber-800"
-                          }`}
-                        >
-                          {v.framingVariant === "gain" ? "Gain-Framed (ጥቅም)" : "Loss-Framed (ጉዳት መከላከያ)"}
+                  return (
+                    <tr key={tpl.id} className="hover:bg-slate-50/70 transition">
+                      <td className="px-6 py-4">
+                        <span className="font-bold text-slate-900 block font-mono">
+                          {tpl.templateCode}
                         </span>
-                        <button
-                          onClick={() => handleCopy(v.messageContent)}
-                          className="text-[11px] font-medium text-slate-500 hover:text-teal-700 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition"
-                        >
-                          <Copy className="w-3 h-3" />
-                          Test in Meter
-                        </button>
-                      </div>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-teal-50 text-teal-800 border border-teal-200 mt-1 uppercase">
+                          {tpl.clinicalStage}
+                        </span>
+                      </td>
 
-                      <p className="text-xs text-slate-800 leading-relaxed font-sans">
-                        "{v.messageContent}"
-                      </p>
+                      <td className="px-6 py-4">
+                        <span className="font-semibold text-slate-800 block">
+                          {tpl.description || "Clinical Guidance"}
+                        </span>
+                        <span className="text-[11px] text-slate-400">WHO ANC Cascade</span>
+                      </td>
 
-                      <div className="text-[10px] text-slate-400 flex items-center gap-2">
-                        <span>Lang: {v.languageCode.toUpperCase()}</span>
-                        <span>•</span>
-                        <span>{v.messageContent.length} chars</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                      <td className="px-6 py-4 max-w-sm">
+                        {gainAm ? (
+                          <div className="space-y-1.5">
+                            <p className="text-slate-800 leading-relaxed font-sans">{gainAm.messageContent}</p>
+                            <div className="flex items-center justify-between">
+                              <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600 text-[10px]">
+                                {gainSeg} segment (UCS-2)
+                              </span>
+                              <button
+                                onClick={() => handleLoadIntoCalculator(gainAm.messageContent, `gain_${tpl.id}`)}
+                                className="text-teal-700 hover:text-teal-900 text-[11px] font-semibold inline-flex items-center gap-1"
+                              >
+                                {copiedId === `gain_${tpl.id}` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                Test in Meter
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+
+                      <td className="px-6 py-4 max-w-sm">
+                        {lossAm ? (
+                          <div className="space-y-1.5">
+                            <p className="text-slate-800 leading-relaxed font-sans">{lossAm.messageContent}</p>
+                            <div className="flex items-center justify-between">
+                              <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600 text-[10px]">
+                                {lossSeg} segment (UCS-2)
+                              </span>
+                              <button
+                                onClick={() => handleLoadIntoCalculator(lossAm.messageContent, `loss_${tpl.id}`)}
+                                className="text-teal-700 hover:text-teal-900 text-[11px] font-semibold inline-flex items-center gap-1"
+                              >
+                                {copiedId === `loss_${tpl.id}` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                Test in Meter
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

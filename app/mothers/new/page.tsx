@@ -1,86 +1,115 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  HeartPulse,
   Calendar,
-  Phone,
   User,
   ShieldCheck,
   CheckCircle2,
   AlertCircle,
   ArrowLeft,
-  Sparkles,
+  Clock,
+  HeartPulse,
 } from "lucide-react";
 import { ethiopianToGregorian, gregorianToEthiopian, formatEthiopianDate } from "@/lib/calendar/ethiopian";
 import { calculateEddFromLmp, calculateGestationalAge } from "@/lib/clinical/gestational-age";
 
 const ETHIOPIAN_MONTHS = [
-  { id: 1, name: "መስከረም (Meskerem)", days: 30 },
-  { id: 2, name: "ጥቅምት (Tikimt)", days: 30 },
-  { id: 3, name: "ኅዳር (Hidar)", days: 30 },
-  { id: 4, name: "ታኅሣሥ (Tahsas)", days: 30 },
-  { id: 5, name: "ጥር (Tir)", days: 30 },
-  { id: 6, name: "የካቲት (Yekatit)", days: 30 },
-  { id: 7, name: "መጋቢት (Megabit)", days: 30 },
-  { id: 8, name: "ሚያዝያ (Miyazya)", days: 30 },
-  { id: 9, name: "ግንቦት (Ginbot)", days: 30 },
-  { id: 10, name: "ሰኔ (Sene)", days: 30 },
-  { id: 11, name: "ሐምሌ (Hamle)", days: 30 },
-  { id: 12, name: "ነሐሴ (Nehase)", days: 30 },
-  { id: 13, name: "ጳጉሜ (Pagume)", days: 6 },
+  { id: 1, name: "1. መስከረም (Meskerem)", days: 30 },
+  { id: 2, name: "2. ጥቅምት (Tikimt)", days: 30 },
+  { id: 3, name: "3. ኅዳር (Hidar)", days: 30 },
+  { id: 4, name: "4. ታኅሣሥ (Tahsas)", days: 30 },
+  { id: 5, name: "5. ጥር (Tir)", days: 30 },
+  { id: 6, name: "6. የካቲት (Yakatit)", days: 30 },
+  { id: 7, name: "7. መጋቢት (Megabit)", days: 30 },
+  { id: 8, name: "8. ሚያዝያ (Miyazya)", days: 30 },
+  { id: 9, name: "9. ግንቦት (Ginbot)", days: 30 },
+  { id: 10, name: "10. ሰኔ (Sene)", days: 30 },
+  { id: 11, name: "11. ሐምሌ (Hamle)", days: 30 },
+  { id: 12, name: "12. ነሐሴ (Nehase)", days: 30 },
+  { id: 13, name: "13. ጳጉሜ (Pagume)", days: 6 },
 ];
 
-export default function EnrollMotherPage() {
+export default function RegisterMotherPage() {
   const router = useRouter();
+  const [facilities, setFacilities] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form Fields
+  // Demographics
   const [fullName, setFullName] = useState("");
-  const [age, setAge] = useState("");
+  const [facilityId, setFacilityId] = useState("");
+  const [kebele, setKebele] = useState("Kebele 02");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [phoneOwner, setPhoneOwner] = useState("self");
-  const [preferredLanguage, setPreferredLanguage] = useState("amh");
-  const [studyCode, setStudyCode] = useState("");
+  const [language, setLanguage] = useState("am");
 
-  // Ethiopian Calendar LMP Dating
-  // Default to Ethiopian year 2017 (current period in Gregorian 2024/2025/2026)
+  // Calendar System Toggle
+  const [calendarType, setCalendarType] = useState<"ethiopian" | "gregorian">("ethiopian");
   const [ethYear, setEthYear] = useState("2017");
   const [ethMonth, setEthMonth] = useState("1");
   const [ethDay, setEthDay] = useState("15");
+  const [gregDate, setGregDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 140);
+    return d.toISOString().split("T")[0];
+  });
 
   // Clinical & Study Assignment
-  const [framingVariant, setFramingVariant] = useState("gain");
-  const [initialAncDate, setInitialAncDate] = useState(
-    new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().split("T")[0]
-  );
+  const [riskStatus, setRiskStatus] = useState("low");
+  const [studyArm, setStudyArm] = useState("intervention_gain");
+  const [nextAncDate, setNextAncDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    d.setHours(9, 0, 0, 0);
+    return d.toISOString().slice(0, 16);
+  });
+
+  useEffect(() => {
+    fetch("/api/facilities")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setFacilities(data);
+          setFacilityId(String(data[0].id));
+        }
+      })
+      .catch((err) => console.error("Failed to load facilities", err));
+  }, []);
 
   // Live Clinical Dating Calculation
   const clinicalDating = useMemo(() => {
     try {
-      const y = parseInt(ethYear, 10);
-      const m = parseInt(ethMonth, 10);
-      const d = parseInt(ethDay, 10);
-      if (!y || !m || !d) return null;
+      let lmpGreg: Date;
+      if (calendarType === "ethiopian") {
+        const y = parseInt(ethYear, 10);
+        const m = parseInt(ethMonth, 10);
+        const d = parseInt(ethDay, 10);
+        if (!y || !m || !d) return null;
+        lmpGreg = ethiopianToGregorian(y, m, d);
+      } else {
+        if (!gregDate) return null;
+        lmpGreg = new Date(gregDate);
+      }
 
-      const lmpGreg = ethiopianToGregorian(y, m, d);
       const eddGreg = calculateEddFromLmp(lmpGreg);
       const eddEth = gregorianToEthiopian(eddGreg);
+      const lmpEth = gregorianToEthiopian(lmpGreg);
       const ga = calculateGestationalAge(eddGreg);
 
       return {
-        lmpGregStr: lmpGreg.toISOString().split("T")[0],
-        eddGregStr: eddGreg.toISOString().split("T")[0],
+        lmpGregFormatted: lmpGreg.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        lmpEthFormatted: formatEthiopianDate(lmpEth.year, lmpEth.month, lmpEth.day),
+        eddGregFormatted: eddGreg.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
         eddEthFormatted: formatEthiopianDate(eddEth.year, eddEth.month, eddEth.day),
         ga,
       };
     } catch (e) {
       return null;
     }
-  }, [ethYear, ethMonth, ethDay]);
+  }, [calendarType, ethYear, ethMonth, ethDay, gregDate]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -93,22 +122,25 @@ export default function EnrollMotherPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fullName,
-          age,
-          studyCode,
+          facilityId,
+          kebele,
           phoneNumber,
           phoneOwner,
-          preferredLanguage,
-          lmpEthiopianYear: ethYear,
-          lmpEthiopianMonth: ethMonth,
-          lmpEthiopianDay: ethDay,
-          framingVariant,
-          initialAncDate,
+          language,
+          calendarType,
+          ethYear,
+          ethMonth,
+          ethDay,
+          gregLmpDate: gregDate,
+          riskStatus,
+          studyArm,
+          nextAncDate,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to enroll mother");
+        throw new Error(data.error || "Failed to register mother");
       }
 
       router.push(`/mothers/${data.participantId}`);
@@ -120,321 +152,356 @@ export default function EnrollMotherPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      {/* Back button & title */}
-      <div>
-        <Link
-          href="/mothers"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 mb-3 group"
-        >
-          <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition" />
-          Back to Mothers Registry
-        </Link>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-          Enroll Mother in SMS Program
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Clinical onboarding protocol for Jimma Zone RCT & Wolkite Health Center.
-        </p>
+      {/* Breadcrumb / Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <Link
+            href="/mothers"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 mb-2 group"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition" />
+            Back to Mothers Registry
+          </Link>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Register Pregnant Mother
+          </h1>
+        </div>
+        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 text-teal-800 border border-teal-200 text-xs font-semibold shrink-0">
+          <HeartPulse className="w-3.5 h-3.5 text-teal-600" />
+          Wolkite & Jimma Protocol
+        </span>
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-3">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
           <div>
-            <h4 className="font-semibold">Enrollment Error</h4>
-            <p className="text-xs text-rose-700 mt-0.5">{error}</p>
+            <h4 className="font-semibold">Registration Incomplete</h4>
+            <p className="mt-0.5 text-rose-700">{error}</p>
           </div>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Step 1: Mother Demographics & Phone Ownership */}
+        {/* Section 1: Demographics */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
           <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-            <User className="w-5 h-5 text-teal-600" />
-            <h2 className="text-base font-semibold text-slate-900">
-              1. Mother Demographics & Contact
+            <span className="w-6 h-6 rounded-full bg-teal-50 text-teal-700 flex items-center justify-center text-xs font-bold">
+              1
+            </span>
+            <h2 className="text-sm font-bold text-slate-900">
+              Mother&apos;s Identification & Contact
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Full Name (የእናት ስም) *
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            {/* Full Name */}
+            <div className="sm:col-span-2 space-y-1">
+              <label className="font-semibold text-slate-700">
+                Full Name of Mother <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
                 required
-                placeholder="e.g. Tigist Haile"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                placeholder="e.g. Tigist Haile"
+                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Age (ዕድሜ)
+            {/* Health Facility */}
+            <div className="space-y-1">
+              <label className="font-semibold text-slate-700">
+                Health Facility <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="number"
-                min="14"
-                max="50"
-                placeholder="e.g. 24"
-                value={age}
-                onChange={(e) => setAge(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Study ID (Optional)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. MNH-048"
-                value={studyCode}
-                onChange={(e) => setStudyCode(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Phone Number (ስልክ ቁጥር) *
-              </label>
-              <input
-                type="tel"
+              <select
                 required
-                placeholder="0911223344 or +251911223344"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-              <span className="text-[11px] text-slate-400 mt-1 block">
-                Normalized to E.164 (+251...) automatically for AfroMessage.
-              </span>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Phone Ownership *
-              </label>
-              <select
-                value={phoneOwner}
-                onChange={(e) => setPhoneOwner(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                value={facilityId}
+                onChange={(e) => setFacilityId(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
               >
-                <option value="self">Mother's Own Phone</option>
-                <option value="husband">Husband's Phone</option>
-                <option value="family">Family Member / Relative</option>
-                <option value="neighbor">Neighbor / Other</option>
-              </select>
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Preferred Reminder Language *
-              </label>
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { code: "amh", label: "አማርኛ (Amharic)" },
-                  { code: "orm", label: "Afaan Oromoo" },
-                  { code: "eng", label: "English" },
-                ].map((lang) => (
-                  <button
-                    key={lang.code}
-                    type="button"
-                    onClick={() => setPreferredLanguage(lang.code)}
-                    className={`py-2 px-3 rounded-lg border text-xs font-medium transition ${
-                      preferredLanguage === lang.code
-                        ? "bg-teal-50 border-teal-500 text-teal-800 ring-1 ring-teal-500"
-                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    {lang.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Step 2: Clinical Dating & Ethiopian Calendar LMP Picker */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
-          <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-            <Calendar className="w-5 h-5 text-teal-600" />
-            <div className="flex-1">
-              <h2 className="text-base font-semibold text-slate-900">
-                2. Clinical Dating in Ethiopian Calendar (ዓመተ ምሕረት)
-              </h2>
-              <p className="text-xs text-slate-500">
-                Select Last Menstrual Period (LMP) date directly from the Ethiopian 13-month calendar.
-              </p>
-            </div>
-          </div>
-
-          {/* Ethiopian Date Selectors */}
-          <div className="grid grid-cols-3 gap-3 bg-teal-50/50 p-4 rounded-xl border border-teal-100">
-            <div>
-              <label className="block text-xs font-semibold text-teal-900 mb-1">
-                ዓመት (Year)
-              </label>
-              <select
-                value={ethYear}
-                onChange={(e) => setEthYear(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-teal-200 bg-white text-sm font-semibold text-teal-950 focus:outline-none focus:ring-2 focus:ring-teal-500"
-              >
-                {[2015, 2016, 2017, 2018, 2019].map((y) => (
-                  <option key={y} value={y}>
-                    {y} ዓ.ም.
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-teal-900 mb-1">
-                ወር (Month)
-              </label>
-              <select
-                value={ethMonth}
-                onChange={(e) => setEthMonth(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-teal-200 bg-white text-sm font-semibold text-teal-950 focus:outline-none focus:ring-2 focus:ring-teal-500"
-              >
-                {ETHIOPIAN_MONTHS.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.id} - {m.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-teal-900 mb-1">
-                ቀን (Day)
-              </label>
-              <select
-                value={ethDay}
-                onChange={(e) => setEthDay(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-teal-200 bg-white text-sm font-semibold text-teal-950 focus:outline-none focus:ring-2 focus:ring-teal-500"
-              >
-                {Array.from({ length: parseInt(ethMonth, 10) === 13 ? 6 : 30 }, (_, i) => i + 1).map(
-                  (d) => (
-                    <option key={d} value={d}>
-                      {d}
+                {facilities.length > 0 ? (
+                  facilities.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
                     </option>
-                  )
+                  ))
+                ) : (
+                  <option value="1">Wolkite Health Center</option>
                 )}
               </select>
             </div>
+
+            {/* Kebele */}
+            <div className="space-y-1">
+              <label className="font-semibold text-slate-700">
+                Kebele / Locality <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={kebele}
+                onChange={(e) => setKebele(e.target.value)}
+                placeholder="e.g. Kebele 02"
+                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+
+            {/* Mobile Phone */}
+            <div className="space-y-1">
+              <label className="font-semibold text-slate-700">
+                Mobile Phone Number <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="+251911223344"
+                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 text-slate-800 font-mono focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+              <span className="text-[11px] text-slate-400 block">
+                Ethio Telecom or Safaricom format (+2519... or +2517...)
+              </span>
+            </div>
+
+            {/* Phone Ownership */}
+            <div className="space-y-1">
+              <label className="font-semibold text-slate-700">
+                Phone Ownership <span className="text-rose-500">*</span>
+              </label>
+              <select
+                required
+                value={phoneOwner}
+                onChange={(e) => setPhoneOwner(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+              >
+                <option value="self">Mother&apos;s Own Phone</option>
+                <option value="spouse">Husband / Spouse</option>
+                <option value="relative">Family / Relative</option>
+                <option value="other">Neighbor / Other</option>
+              </select>
+            </div>
+
+            {/* Language */}
+            <div className="space-y-1">
+              <label className="font-semibold text-slate-700">Language Preference</label>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+              >
+                <option value="am">Amharic (አማርኛ)</option>
+                <option value="en">English</option>
+                <option value="gurage">Gurage</option>
+              </select>
+            </div>
           </div>
 
-          {/* Live Calculated Clinical Metrics */}
-          {clinicalDating && (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-              <div className="flex items-center gap-2 text-xs font-semibold text-teal-700 uppercase tracking-wider">
-                <Sparkles className="w-4 h-4" />
-                Live Gestational Age & EDD Calculation (Naegele's Rule)
+          <div className="p-3 bg-slate-50 rounded-lg flex items-center gap-2.5 text-slate-600 text-[11px] border border-slate-200">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>
+              <strong>Shared Phone Safety:</strong> Because mobile devices are often shared in the household, automated SMS content will never disclose medical diagnosis or personal health records.
+            </span>
+          </div>
+        </div>
+
+        {/* Section 2: Obstetric Dating & Calendar System */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-teal-50 text-teal-700 flex items-center justify-center text-xs font-bold">
+                2
+              </span>
+              <h2 className="text-sm font-bold text-slate-900">
+                Last Menstrual Period (LMP) & Calendar
+              </h2>
+            </div>
+
+            {/* Calendar System Toggle Pills */}
+            <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-100 text-xs">
+              <button
+                type="button"
+                onClick={() => setCalendarType("ethiopian")}
+                className={`px-3 py-1 rounded-md font-semibold transition ${
+                  calendarType === "ethiopian"
+                    ? "bg-white text-teal-700 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Ethiopian (ዓ.ም / E.C.)
+              </button>
+              <button
+                type="button"
+                onClick={() => setCalendarType("gregorian")}
+                className={`px-3 py-1 rounded-md font-semibold transition ${
+                  calendarType === "gregorian"
+                    ? "bg-white text-teal-700 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Gregorian (G.C.)
+              </button>
+            </div>
+          </div>
+
+          {/* Ethiopian Calendar Inputs */}
+          {calendarType === "ethiopian" ? (
+            <div className="p-4 rounded-xl border border-teal-200 bg-teal-50/40 space-y-3">
+              <label className="font-semibold text-slate-700 text-xs block">
+                የመጨረሻ የወር አበባ የታየበት ቀን (LMP Date in Ethiopian Calendar):
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div>
+                  <label className="text-[11px] text-slate-500 mb-1 block">ዓመተ ምሕረት (Year)</label>
+                  <input
+                    type="number"
+                    min="2010"
+                    max="2030"
+                    value={ethYear}
+                    onChange={(e) => setEthYear(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white font-mono text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-500 mb-1 block">ወር (Month)</label>
+                  <select
+                    value={ethMonth}
+                    onChange={(e) => setEthMonth(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-800"
+                  >
+                    {ETHIOPIAN_MONTHS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-500 mb-1 block">ቀን (Day 1–30)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="30"
+                    value={ethDay}
+                    onChange={(e) => setEthDay(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white font-mono text-slate-800"
+                  />
+                </div>
               </div>
+            </div>
+          ) : (
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+              <label className="font-semibold text-slate-700 text-xs block">
+                LMP Date (Gregorian Calendar):
+              </label>
+              <input
+                type="date"
+                value={gregDate}
+                onChange={(e) => setGregDate(e.target.value)}
+                className="px-3.5 py-2 rounded-lg border border-slate-200 bg-white text-xs font-mono text-slate-800"
+              />
+            </div>
+          )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-white p-3 rounded-lg border border-slate-200">
-                  <span className="text-[11px] text-slate-400 block uppercase">Current Gestational Age</span>
-                  <span className="text-base font-bold text-slate-900 block mt-0.5">
-                    {clinicalDating.ga.weeks}w {clinicalDating.ga.days}d
-                  </span>
-                  <span className="text-xs text-teal-600 font-medium">
-                    Trimester {clinicalDating.ga.trimester}
-                  </span>
+          {/* Live Clinical Dating Calculation Preview Card */}
+          {clinicalDating && (
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-teal-800 block">
+                Live Obstetric Calculation (Naegele&apos;s Rule)
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div>
+                  <span className="text-[11px] text-slate-400 block">LMP (GC)</span>
+                  <span className="font-semibold text-slate-800">{clinicalDating.lmpGregFormatted}</span>
                 </div>
-
-                <div className="bg-white p-3 rounded-lg border border-slate-200">
-                  <span className="text-[11px] text-slate-400 block uppercase">EDD (የሚወልዱበት ቀን - ዓ.ም.)</span>
-                  <span className="text-base font-bold text-teal-900 block mt-0.5">
-                    {clinicalDating.eddEthFormatted}
-                  </span>
-                  <span className="text-xs text-slate-500">Ethiopian Calendar</span>
+                <div>
+                  <span className="text-[11px] text-slate-400 block">EDD (ዓ.ም)</span>
+                  <span className="font-bold text-teal-700">{clinicalDating.eddEthFormatted}</span>
                 </div>
-
-                <div className="bg-white p-3 rounded-lg border border-slate-200">
-                  <span className="text-[11px] text-slate-400 block uppercase">EDD (Gregorian Calendar)</span>
-                  <span className="text-base font-bold text-slate-900 block mt-0.5">
-                    {clinicalDating.eddGregStr}
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    LMP: {clinicalDating.lmpGregStr}
+                <div>
+                  <span className="text-[11px] text-slate-400 block">EDD (GC)</span>
+                  <span className="font-semibold text-slate-800">{clinicalDating.eddGregFormatted}</span>
+                </div>
+                <div>
+                  <span className="text-[11px] text-slate-400 block">Gestational Age</span>
+                  <span className="font-bold text-slate-900">
+                    {clinicalDating.ga.formatted} (T{clinicalDating.ga.trimester})
                   </span>
                 </div>
               </div>
             </div>
           )}
-        </div>
 
-        {/* Step 3: First ANC Appointment & Framing Assignment */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
-          <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-            <HeartPulse className="w-5 h-5 text-teal-600" />
-            <h2 className="text-base font-semibold text-slate-900">
-              3. Study Protocol & First Clinic Appointment
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                First ANC Clinic Date *
-              </label>
-              <input
-                type="date"
-                required
-                value={initialAncDate}
-                onChange={(e) => setInitialAncDate(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-              <span className="text-[11px] text-slate-400 mt-1 block">
-                72-hour automated reminder will be dispatched before this date.
-              </span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div className="space-y-1">
+              <label className="font-semibold text-slate-700">Clinical Risk Assessment</label>
+              <select
+                value={riskStatus}
+                onChange={(e) => setRiskStatus(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+              >
+                <option value="low">Low Risk (Standard Antenatal Pathway)</option>
+                <option value="high">High Risk (Prior complications, conditions)</option>
+              </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Message Framing Arm (RCT Assignment)
-              </label>
+            <div className="space-y-1">
+              <label className="font-semibold text-slate-700">Message Tone / Study Arm</label>
               <select
-                value={framingVariant}
-                onChange={(e) => setFramingVariant(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                value={studyArm}
+                onChange={(e) => setStudyArm(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
               >
-                <option value="gain">Gain-Framed (Health benefits & positive reinforcement)</option>
-                <option value="loss">Loss-Framed (Danger signs & risk mitigation)</option>
+                <option value="intervention_gain">Encouraging (Gain-framed benefits)</option>
+                <option value="intervention_loss">Risk-aware (Loss-framed cautions)</option>
+                <option value="control">Control (Routine facility care only)</option>
               </select>
             </div>
           </div>
+        </div>
 
-          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-start gap-3">
-            <ShieldCheck className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
-            <p className="leading-relaxed">
-              <strong>Clinical Consent & Protocol:</strong> By submitting, the participant is registered in the Jimma/Wolkite MNH SMS automated cohort. The system will schedule gestational milestone reminders, 72-hour pre-visit alerts, and immediate delivery follow-up.
-            </p>
+        {/* Section 3: Next Antenatal Care (ANC) Visit */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+            <span className="w-6 h-6 rounded-full bg-teal-50 text-teal-700 flex items-center justify-center text-xs font-bold">
+              3
+            </span>
+            <h2 className="text-sm font-bold text-slate-900">
+              Next Antenatal Care (ANC) Visit
+            </h2>
+          </div>
+
+          <div className="text-xs space-y-1 max-w-sm">
+            <label className="font-semibold text-slate-700">Next Checkup Date & Time</label>
+            <input
+              type="datetime-local"
+              value={nextAncDate}
+              onChange={(e) => setNextAncDate(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-lg border border-slate-200 font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            />
+            <span className="text-[11px] text-slate-400 block">
+              The system will automatically schedule a 72-hour reminder SMS before this visit.
+            </span>
           </div>
         </div>
 
-        {/* Submit Actions */}
+        {/* Actions */}
         <div className="flex items-center justify-end gap-3 pt-2">
           <Link
             href="/mothers"
-            className="px-5 py-2.5 rounded-lg border border-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+            className="px-4 py-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition"
           >
             Cancel
           </Link>
           <button
             type="submit"
             disabled={submitting}
-            className="px-6 py-2.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold shadow-sm transition active:scale-95 disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs shadow-sm transition active:scale-95 disabled:opacity-50"
           >
-            {submitting ? "Enrolling..." : "Complete Enrollment"}
+            <CheckCircle2 className="w-4 h-4" />
+            {submitting ? "Saving & Scheduling..." : "Save Mother & Start SMS Stream"}
           </button>
         </div>
       </form>

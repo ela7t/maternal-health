@@ -13,26 +13,32 @@ import {
   Calendar,
   AlertCircle,
   Clock,
+  ShieldAlert,
+  CheckCircle2,
+  X,
 } from "lucide-react";
 
 interface Mother {
   id: string;
   studyCode: string;
   fullName: string;
-  age: number | null;
+  kebele: string;
   phone: string;
   phoneOwner: string;
   preferredLanguage: string;
   facilityName: string;
   stage: string;
-  ga: { weeks: number; days: number; trimester: number; isOverdue: boolean } | null;
+  pncFormatted: string | null;
+  ga: { weeks: number; days: number; trimester: number; formatted: string } | null;
   status: string;
+  studyArm: string;
   activePregnancyId: string | null;
   nextAppointment: {
     id: string;
     visitType: string;
     scheduledFor: string;
   } | null;
+  edd: string | null;
 }
 
 export default function MothersRegistryPage() {
@@ -61,12 +67,14 @@ export default function MothersRegistryPage() {
   }
 
   const filteredMothers = mothers.filter((m) => {
-    if (!search) return true;
-    const query = search.toLowerCase();
+    if (!search.trim()) return true;
+    const q = search.toLowerCase().trim();
     return (
-      m.fullName.toLowerCase().includes(query) ||
-      m.studyCode.toLowerCase().includes(query) ||
-      m.phone.includes(query)
+      m.fullName.toLowerCase().includes(q) ||
+      m.studyCode.toLowerCase().includes(q) ||
+      m.phone.includes(q) ||
+      m.facilityName.toLowerCase().includes(q) ||
+      m.kebele.toLowerCase().includes(q)
     );
   });
 
@@ -76,32 +84,40 @@ export default function MothersRegistryPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Mothers & Newborn Registry
+            Mothers & Participants Registry
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Enrolled participants under automated SMS protocol at Jimma / Wolkite Health Center.
+            Longitudinal tracking of registered pregnant and postpartum women across primary healthcare facilities.
           </p>
         </div>
         <Link
           href="/mothers/new"
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm shadow-sm transition"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm shadow-sm transition active:scale-95"
         >
           <Plus className="w-4 h-4" />
-          Enroll New Mother
+          Register New Mother
         </Link>
       </div>
 
-      {/* Search & Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      {/* Search & Clinical Filter Bar */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center gap-3 text-xs">
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search by mother name, study code, or phone (+251)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+            placeholder="Search by mother name, ID code (e.g. MOM-), or phone number..."
+            className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -109,142 +125,178 @@ export default function MothersRegistryPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500 font-medium"
           >
-            <option value="all">All Statuses</option>
-            <option value="pregnant">Antenatal (Pregnant)</option>
-            <option value="postnatal">Postnatal (Day 1 - 42)</option>
-            <option value="loss">Sensitive Loss (Halted)</option>
+            <option value="all">All Care Stages</option>
+            <option value="active_pregnant">Active Pregnant</option>
+            <option value="postnatal">Postnatal Care (0–6 Weeks)</option>
+            <option value="completed">Completed (Graduated)</option>
+            <option value="opted_out">Opted Out (STOP)</option>
+            <option value="loss">Sensitive Loss Halt</option>
           </select>
+
+          {(statusFilter !== "all" || search) && (
+            <button
+              onClick={() => {
+                setStatusFilter("all");
+                setSearch("");
+              }}
+              className="px-2.5 py-2 text-slate-500 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition"
+            >
+              Reset
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Registry Table */}
+      {/* Cohort Table Card */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="p-12 text-center text-slate-400 text-sm">
-            Loading participant registry...
-          </div>
-        ) : filteredMothers.length === 0 ? (
-          <div className="p-12 text-center space-y-3">
-            <Users className="w-10 h-10 text-slate-300 mx-auto" />
-            <p className="text-slate-500 text-sm">No participants match your criteria.</p>
-            <Link
-              href="/mothers/new"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-600 hover:text-teal-700"
-            >
-              + Enroll the first mother
-            </Link>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-600">
-              <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase font-semibold text-slate-500 tracking-wider">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <span className="font-bold text-slate-900 text-sm">
+            Registered Cohort ({filteredMothers.length})
+          </span>
+          <span className="text-xs text-slate-400">
+            Wolkite & Jimma Primary Centers
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs text-slate-600">
+            <thead className="bg-slate-50 border-b border-slate-200 uppercase font-semibold text-slate-500 tracking-wider">
+              <tr>
+                <th className="px-6 py-3.5">Mother Profile</th>
+                <th className="px-6 py-3.5">Facility & Kebele</th>
+                <th className="px-6 py-3.5">Clinical Stage</th>
+                <th className="px-6 py-3.5">Phone (Owner)</th>
+                <th className="px-6 py-3.5">Status</th>
+                <th className="px-6 py-3.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
                 <tr>
-                  <th className="px-6 py-3.5">Study Code & Mother</th>
-                  <th className="px-6 py-3.5">Phone & Ownership</th>
-                  <th className="px-6 py-3.5">Clinical Stage</th>
-                  <th className="px-6 py-3.5">Next Appointment</th>
-                  <th className="px-6 py-3.5">Status</th>
-                  <th className="px-6 py-3.5 text-right">Actions</th>
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                    Loading mothers registry...
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredMothers.map((m) => (
+              ) : filteredMothers.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                    No enrolled mothers match this filter or search query.
+                  </td>
+                </tr>
+              ) : (
+                filteredMothers.map((m) => (
                   <tr key={m.id} className="hover:bg-slate-50/80 transition">
+                    {/* Mother Profile */}
                     <td className="px-6 py-4">
-                      <div>
-                        <span className="font-semibold text-slate-900 block">
-                          {m.fullName}
-                        </span>
-                        <span className="text-xs text-slate-400">
-                          {m.studyCode} • {m.age ? `${m.age} yrs` : "Age N/A"} • {m.preferredLanguage.toUpperCase()}
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5">
-                        <Phone className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="font-mono text-xs text-slate-800">{m.phone}</span>
-                      </div>
-                      <span className="text-[11px] text-slate-400 capitalize">
-                        {m.phoneOwner === "self" ? "Own Phone" : `Owner: ${m.phoneOwner}`}
-                      </span>
-                    </td>
-
-                    <td className="px-6 py-4">
-                      {m.status === "active" && m.ga ? (
-                        <div className="space-y-0.5">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                            m.ga.trimester === 1 ? "badge-t1 border" :
-                            m.ga.trimester === 2 ? "badge-t2 border" : "badge-t3 border"
-                          }`}>
-                            Trimester {m.ga.trimester}
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-teal-50 text-teal-700 font-bold text-xs flex items-center justify-center shrink-0">
+                          {m.fullName.charAt(0)}
+                        </div>
+                        <div>
+                          <Link
+                            href={`/mothers/${m.id}`}
+                            className="font-bold text-slate-900 hover:text-teal-700 block text-xs"
+                          >
+                            {m.fullName}
+                          </Link>
+                          <span className="text-[11px] font-mono text-slate-400">
+                            {m.studyCode}
                           </span>
-                          <p className="text-xs text-slate-500 font-medium">
-                            {m.ga.weeks} weeks, {m.ga.days} days
-                          </p>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Facility & Kebele */}
+                    <td className="px-6 py-4">
+                      <span className="font-semibold text-slate-800 block">
+                        {m.facilityName}
+                      </span>
+                      <span className="text-[11px] text-slate-400">{m.kebele}</span>
+                    </td>
+
+                    {/* Clinical Stage */}
+                    <td className="px-6 py-4">
+                      {m.status === "active_pregnant" && m.ga ? (
+                        <div>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-teal-50 text-teal-700 border border-teal-200">
+                            <Calendar className="w-3 h-3" />
+                            {m.ga.formatted} (T{m.ga.trimester})
+                          </span>
+                          {m.edd && (
+                            <span className="block text-[11px] text-slate-400 mt-1">
+                              EDD: {new Date(m.edd).toLocaleDateString()}
+                            </span>
+                          )}
                         </div>
                       ) : m.status === "postnatal" ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium badge-postnatal border">
-                          Postnatal (Day 1 - 42)
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                          <Baby className="w-3 h-3" />
+                          {m.pncFormatted || "Postnatal (0-6 Wks)"}
                         </span>
                       ) : m.status === "loss" ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200">
-                          Loss / Halted
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-rose-50 text-rose-700 border border-rose-200">
+                          <ShieldAlert className="w-3 h-3" />
+                          Sensitive Loss Halt
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-400">Inactive</span>
+                        <span className="text-slate-400">—</span>
                       )}
                     </td>
 
+                    {/* Phone (Owner) */}
                     <td className="px-6 py-4">
-                      {m.nextAppointment ? (
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-1 text-xs font-medium text-slate-800">
-                            <Calendar className="w-3.5 h-3.5 text-teal-600" />
-                            {m.nextAppointment.visitType}
-                          </div>
-                          <span className="text-xs text-slate-500">
-                            {new Date(m.nextAppointment.scheduledFor).toLocaleDateString()}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400 italic">None scheduled</span>
-                      )}
-                    </td>
-
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
-                          m.status === "active"
-                            ? "bg-teal-50 text-teal-700"
-                            : m.status === "postnatal"
-                            ? "bg-purple-50 text-purple-700"
-                            : m.status === "loss"
-                            ? "bg-rose-50 text-rose-700"
-                            : "bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        {m.status}
+                      <span className="font-semibold font-mono text-slate-800 block">
+                        {m.phone}
+                      </span>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 capitalize">
+                        {m.phoneOwner}&apos;s phone
                       </span>
                     </td>
 
+                    {/* Status Badge */}
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold capitalize ${
+                          m.status === "active_pregnant"
+                            ? "bg-teal-50 text-teal-700 border border-teal-200"
+                            : m.status === "postnatal"
+                            ? "bg-purple-50 text-purple-700 border border-purple-200"
+                            : m.status === "completed"
+                            ? "bg-slate-100 text-slate-700 border border-slate-200"
+                            : m.status === "opted_out"
+                            ? "bg-amber-50 text-amber-700 border border-amber-200"
+                            : "bg-rose-50 text-rose-700 border border-rose-200"
+                        }`}
+                      >
+                        {m.status === "active_pregnant"
+                          ? "Pregnant"
+                          : m.status === "postnatal"
+                          ? "Postnatal"
+                          : m.status === "completed"
+                          ? "Graduated"
+                          : m.status === "opted_out"
+                          ? "Opted Out"
+                          : "Sensitive Loss"}
+                      </span>
+                    </td>
+
+                    {/* Action */}
                     <td className="px-6 py-4 text-right">
                       <Link
                         href={`/mothers/${m.id}`}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-teal-600 hover:text-teal-800"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition"
                       >
-                        Profile <ArrowRight className="w-3.5 h-3.5" />
+                        View Profile <ArrowRight className="w-3 h-3" />
                       </Link>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

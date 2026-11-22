@@ -1,23 +1,24 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
 import {
   HeartPulse,
   Users,
-  CalendarCheck2,
+  CalendarCheck,
   BookOpenText,
   Send,
   Building2,
-  ShieldAlert,
+  ShieldCheck,
+  Activity,
+  CheckCircle2,
 } from "lucide-react";
 
-const inter = Inter({ subsets: ["latin"] });
+const font = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"] });
 
 export const metadata: Metadata = {
-  title: "MNH Automated SMS Platform | Jimma & Wolkite Clinical Model",
-  description:
-    "Automated Ethiopian Maternal & Newborn Health reminder platform with AfroMessage integration and Ethiopian Calendar support.",
+  title: "Maternal & Newborn Care System | Wolkite & Jimma Protocol",
+  description: "Automated SMS Reminder System for Maternal & Newborn Health in Ethiopia.",
 };
 
 export default function RootLayout({
@@ -27,78 +28,91 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.className} min-h-screen flex flex-col bg-slate-50 text-slate-900`}>
-        {/* Top Clinical Navigation Bar */}
-        <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
+      <body className={`${font.className} min-h-screen flex flex-col bg-slate-50 text-slate-900`}>
+        {/* Top Clinical Header Bar */}
+        <div className="bg-white border-b border-slate-200 px-4 sm:px-8 py-2.5 flex flex-wrap items-center justify-between text-xs text-slate-600 gap-2">
+          <div className="flex items-center gap-3">
+            <span className="font-semibold text-slate-800 flex items-center gap-1.5">
+              <Building2 className="w-4 h-4 text-teal-700" />
+              Wolkite Health Center & Jimma Primary Hospital
+            </span>
+            <span className="text-slate-300">|</span>
+            <span className="text-slate-500 hidden sm:inline">MNH Automated SMS Platform</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1.5 text-emerald-700 font-medium">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              AfroMessage Gateway Live
+            </span>
+            <span className="text-slate-300">|</span>
+            <span className="text-slate-500">Ethiopian Calendar (ዓ.ም.) Active</span>
+          </div>
+        </div>
+
+        {/* Main Dark Slate Navigation Bar */}
+        <header className="sticky top-0 z-40 bg-slate-900 text-white shadow-md">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              {/* Brand Logo & Clinical Context */}
-              <div className="flex items-center gap-3">
-                <Link href="/" className="flex items-center gap-2.5 group">
-                  <div className="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center text-white shadow-sm shadow-teal-500/20 group-hover:bg-teal-700 transition">
-                    <HeartPulse className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-900 text-lg tracking-tight block leading-tight">
-                      MNH Reminder
-                    </span>
-                    <span className="text-xs text-slate-500 flex items-center gap-1 font-normal">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
-                      Jimma / Wolkite Clinical Protocol
-                    </span>
-                  </div>
-                </Link>
-              </div>
+            <div className="flex items-center justify-between h-14">
+              {/* Brand Logo */}
+              <Link href="/" className="flex items-center gap-2.5 group">
+                <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center text-white shadow-sm group-hover:bg-teal-500 transition">
+                  <HeartPulse className="w-5 h-5" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-bold text-white text-base tracking-tight leading-none">
+                    MNH Reminder
+                  </span>
+                  <span className="text-[10px] text-teal-400 font-medium mt-0.5">
+                    Jimma / Wolkite Clinical Protocol
+                  </span>
+                </div>
+              </Link>
 
               {/* Navigation Links */}
-              <nav className="hidden md:flex items-center space-x-1">
+              <nav className="hidden md:flex items-center space-x-1 h-full">
                 <Link
                   href="/"
-                  className="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-700 hover:text-teal-700 hover:bg-slate-100 transition"
+                  className="px-3.5 h-full flex items-center text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 border-b-2 border-transparent hover:border-teal-400 transition"
                 >
                   Dashboard
                 </Link>
                 <Link
                   href="/mothers"
-                  className="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-700 hover:text-teal-700 hover:bg-slate-100 transition flex items-center gap-1.5"
+                  className="px-3.5 h-full flex items-center text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 border-b-2 border-transparent hover:border-teal-400 transition gap-1.5"
                 >
                   <Users className="w-4 h-4 text-slate-400" />
                   Mothers Registry
                 </Link>
                 <Link
                   href="/visits"
-                  className="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-700 hover:text-teal-700 hover:bg-slate-100 transition flex items-center gap-1.5"
+                  className="px-3.5 h-full flex items-center text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 border-b-2 border-transparent hover:border-teal-400 transition gap-1.5"
                 >
-                  <CalendarCheck2 className="w-4 h-4 text-slate-400" />
+                  <CalendarCheck className="w-4 h-4 text-slate-400" />
                   Visits & Triage
                 </Link>
                 <Link
                   href="/messages"
-                  className="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-700 hover:text-teal-700 hover:bg-slate-100 transition flex items-center gap-1.5"
+                  className="px-3.5 h-full flex items-center text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 border-b-2 border-transparent hover:border-teal-400 transition gap-1.5"
                 >
                   <BookOpenText className="w-4 h-4 text-slate-400" />
                   Message Bank
                 </Link>
                 <Link
                   href="/activity"
-                  className="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-700 hover:text-teal-700 hover:bg-slate-100 transition flex items-center gap-1.5"
+                  className="px-3.5 h-full flex items-center text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 border-b-2 border-transparent hover:border-teal-400 transition gap-1.5"
                 >
                   <Send className="w-4 h-4 text-slate-400" />
                   SMS Outbox
                 </Link>
               </nav>
 
-              {/* Facility & Quick Enrollment Button */}
-              <div className="flex items-center gap-3">
-                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-xs text-slate-600 font-medium">
-                  <Building2 className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Wolkite Health Center</span>
-                </div>
+              {/* Quick Actions */}
+              <div className="flex items-center gap-2">
                 <Link
                   href="/mothers/new"
-                  className="inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded-lg shadow-sm transition active:scale-[0.98]"
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-lg shadow-sm transition active:scale-95"
                 >
-                  + Enroll Mother
+                  + Register Mother
                 </Link>
               </div>
             </div>
@@ -106,17 +120,17 @@ export default function RootLayout({
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {children}
         </main>
 
         {/* Clinical Privacy & Protocol Footer */}
-        <footer className="bg-white border-t border-slate-200 py-6 text-xs text-slate-500">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <footer className="bg-white border-t border-slate-200 py-4 text-xs text-slate-500">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-teal-600" />
+              <ShieldCheck className="w-4 h-4 text-teal-700" />
               <span>
-                <strong>Confidential Clinical System:</strong> Plain SMS text never reveals participant names or diagnoses.
+                <strong>Confidential Clinical System:</strong> Automated SMS text never discloses patient names or sensitive diagnoses due to shared household phones.
               </span>
             </div>
             <div className="text-slate-400">

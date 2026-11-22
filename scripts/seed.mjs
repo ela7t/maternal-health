@@ -182,6 +182,137 @@ async function main() {
     },
   });
 
+  // 4. Participant 2: Postnatal Mother (Fatuma Mohammed)
+  const deliveryDate = new Date(today);
+  deliveryDate.setDate(deliveryDate.getDate() - 4);
+  const lmpDate2 = new Date(deliveryDate);
+  lmpDate2.setDate(lmpDate2.getDate() - 280);
+
+  const m2 = await prisma.participant.upsert({
+    where: { publicCode: "MOM-FTMA02" },
+    update: {},
+    create: {
+      publicCode: "MOM-FTMA02",
+      fullName: "Fatuma Mohammed",
+      kebele: "Kebele 01",
+      facilityId: f1.id,
+      studyArm: "intervention_loss",
+      preferredLanguage: "am",
+      status: "postnatal",
+      consentRecordedBy: "Sister Almaz Bekele",
+      phones: {
+        create: {
+          numberE164: "+251922334455",
+          phoneHash: "hash_test_2",
+          isPrimary: true,
+          ownerType: "spouse",
+        },
+      },
+      pregnancies: {
+        create: {
+          lmpDate: lmpDate2,
+          eddDate: deliveryDate,
+          deliveredAt: deliveryDate,
+          deliveryPlace: "Wolkite Health Center",
+          outcome: "live_birth",
+          datingMethod: "lmp",
+          riskStatus: "low",
+          babies: {
+            create: {
+              name: "Baby Dawit",
+              babyCode: "BABY-DW01",
+              dateOfBirth: deliveryDate,
+              status: "alive",
+            },
+          },
+        },
+      },
+    },
+  });
+
+  // 5. Participant 3: Missed Appointment Mother (Genet Wolde)
+  const lmpDate3 = new Date(today);
+  lmpDate3.setDate(lmpDate3.getDate() - 182); // 26 weeks
+  const eddDate3 = new Date(lmpDate3);
+  eddDate3.setDate(eddDate3.getDate() + 280);
+
+  const m3 = await prisma.participant.upsert({
+    where: { publicCode: "MOM-GNET03" },
+    update: {},
+    create: {
+      publicCode: "MOM-GNET03",
+      fullName: "Genet Wolde",
+      kebele: "Kebele 05",
+      facilityId: f2.id,
+      studyArm: "intervention_gain",
+      preferredLanguage: "am",
+      status: "active_pregnant",
+      consentRecordedBy: "Dr. Tadesse Gemechu",
+      phones: {
+        create: {
+          numberE164: "+251933445566",
+          phoneHash: "hash_test_3",
+          isPrimary: true,
+          ownerType: "self",
+        },
+      },
+      pregnancies: {
+        create: {
+          lmpDate: lmpDate3,
+          eddDate: eddDate3,
+          datingMethod: "lmp",
+          riskStatus: "low",
+          outcome: "ongoing",
+        },
+      },
+      appointments: {
+        create: {
+          kind: "anc",
+          scheduledFor: new Date(Date.now() - 48 * 60 * 60 * 1000), // 48 hours ago
+          status: "missed",
+          recordedBy: "Dr. Tadesse Gemechu",
+          notes: "Routine ANC checkup - missed attendance",
+        },
+      },
+    },
+  });
+
+  // 6. Seed sample outbox messages
+  const sampleVariant = await prisma.templateVariant.findFirst({
+    where: { template: { code: "GA_W20_NUTRITION" }, language: "am", framing: "gain" },
+  });
+
+  if (sampleVariant) {
+    const existingMsg = await prisma.outboxMessage.findFirst({
+      where: { participantId: m1.id },
+    });
+    if (!existingMsg) {
+      const p1Phone = await prisma.participantPhone.findFirst({ where: { participantId: m1.id } });
+      await prisma.outboxMessage.create({
+        data: {
+          participantId: m1.id,
+          phoneId: p1Phone.id,
+          variantId: sampleVariant.id,
+          messageContent: sampleVariant.body,
+          segments: 2,
+          status: "delivered",
+          scheduledAt: new Date(Date.now() - 2 * 3600 * 1000),
+          sentAt: new Date(Date.now() - 2 * 3600 * 1000),
+          deliveredAt: new Date(Date.now() - 2 * 3600 * 1000),
+          idempotencyKey: `SEED_MSG_M1_${Date.now()}`,
+          callbackToken: "seed_token_1",
+          deliveryEvents: {
+            create: {
+              rawStatus: "DELIVERED",
+              mappedStatus: "delivered",
+              rawPayload: { status: "DELIVERED" },
+            },
+          },
+        },
+      });
+    }
+  }
+
   console.log("Seeding completed successfully!");
 }
 
