@@ -1,0 +1,102 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}SMS Activity Log - Maternal & Newborn Care{% endblock %}
+
+{% block body %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-4">
+    <div>
+        <h3 class="fw-bold mb-1 text-slate-900">Automated SMS Activity Log</h3>
+        <p class="text-secondary mb-0 small">Real-time tracking of prenatal educational messages, 72-hour appointment reminders, and network delivery receipts.</p>
+    </div>
+    <form method="POST" action="{{ path('app_outbox_run_now') }}">
+        <button type="submit" class="btn-medical shadow-sm">
+            <i class="bi bi-arrow-repeat"></i> Trigger Scheduler Check
+        </button>
+    </form>
+</div>
+
+<!-- Outbox Card -->
+<div class="card-custom overflow-hidden">
+    <div class="card-header-clean bg-light d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-send text-teal" style="color: var(--app-primary);"></i>
+            <span class="fw-bold text-dark">Dispatched & Scheduled Messages ({{ messages|length }})</span>
+        </div>
+        <div class="btn-group btn-group-sm">
+            <a href="{{ path('app_outbox_list') }}" class="btn btn-outline-secondary {% if not currentStatus %}active{% endif %}">All</a>
+            <a href="{{ path('app_outbox_list', {status: 'submitted'}) }}" class="btn btn-outline-secondary {% if currentStatus == 'submitted' %}active{% endif %}">Delivered</a>
+            <a href="{{ path('app_outbox_list', {status: 'pending'}) }}" class="btn btn-outline-secondary {% if currentStatus == 'pending' %}active{% endif %}">Queued</a>
+            <a href="{{ path('app_outbox_list', {status: 'failed'}) }}" class="btn btn-outline-danger {% if currentStatus == 'failed' %}active{% endif %}">Failed</a>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-custom">
+            <thead>
+                <tr>
+                    <th>Mother</th>
+                    <th>Recipient Phone</th>
+                    <th>SMS Text Preview</th>
+                    <th>Segments (UCS-2)</th>
+                    <th>Network Status</th>
+                    <th>Gateway Ref</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for msg in messages %}
+                    <tr>
+                        <td>
+                            <a href="{{ path('app_participant_show', {id: msg.participant.id}) }}" class="fw-bold text-dark text-decoration-none">
+                                {{ msg.participant.fullName }}
+                            </a>
+                            <div class="text-secondary small font-monospace">{{ msg.participant.publicCode }}</div>
+                        </td>
+                        <td>
+                            <div class="small fw-semibold text-dark">{{ msg.phone.numberE164 }}</div>
+                            <span class="badge bg-light text-secondary border small">{{ msg.phone.ownerType|capitalize }}'s phone</span>
+                        </td>
+                        <td style="max-width: 380px;">
+                            <div class="small text-slate-700">{{ msg.messageContent }}</div>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border small">{{ msg.segments }} seg</span>
+                        </td>
+                        <td>
+                            {% if msg.status in ['sent', 'delivered', 'submitted'] %}
+                                <span class="badge-clinical postnatal">
+                                    <i class="bi bi-check2-all"></i> Delivered
+                                </span>
+                            {% elseif msg.status == 'pending' %}
+                                <span class="badge-clinical opted-out">
+                                    <i class="bi bi-hourglass-split"></i> Queued
+                                </span>
+                            {% elseif msg.status == 'cancelled' %}
+                                <span class="badge-clinical completed">
+                                    <i class="bi bi-dash-circle"></i> Cancelled
+                                </span>
+                            {% else %}
+                                <span class="badge-clinical missed">
+                                    <i class="bi bi-x-circle"></i> Failed
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-secondary small font-monospace">
+                            {{ msg.gatewayMessageId ?: 'Pending' }}
+                        </td>
+                        <td class="text-secondary small">
+                            {{ msg.sentAt ? msg.sentAt|date('M d, H:i') : msg.scheduledAt|date('M d, H:i') }}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-5">
+                            No messages currently in the outbox.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

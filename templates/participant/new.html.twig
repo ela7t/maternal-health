@@ -1,0 +1,226 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Register Mother - Maternal & Newborn Care{% endblock %}
+
+{% block body %}
+<div class="row justify-content-center">
+    <div class="col-lg-9 col-xl-8">
+        
+        <!-- Breadcrumb / Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <a href="{{ path('app_participants_list') }}" class="text-secondary small text-decoration-none d-flex align-items-center gap-1 mb-1">
+                    <i class="bi bi-arrow-left"></i> Back to Mothers Registry
+                </a>
+                <h3 class="fw-bold mb-0 text-slate-900">Register Pregnant Mother</h3>
+            </div>
+            <span class="badge bg-light text-dark border px-3 py-2 small">
+                <i class="bi bi-hospital text-teal me-1" style="color: var(--app-primary);"></i> Wolkite & Jimma Protocol
+            </span>
+        </div>
+
+        <div class="card-custom p-4 p-md-5">
+            <form method="POST" action="{{ path('app_participant_new') }}" id="registerMotherForm">
+                
+                <!-- Section 1: Demographics -->
+                <div class="mb-5">
+                    <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom">
+                        <span class="badge rounded-circle p-2 bg-teal bg-opacity-10 text-teal" style="background-color: var(--app-primary-light); color: var(--app-primary);">
+                            <i class="bi bi-person-fill fs-6"></i>
+                        </span>
+                        <h5 class="fw-bold mb-0 text-dark">1. Mother's Identification & Contact</h5>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold text-secondary">Full Name of Mother <span class="text-danger">*</span></label>
+                            <input type="text" name="full_name" class="form-control" placeholder="e.g. Tigist Haile" required>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label small fw-semibold text-secondary">Health Facility <span class="text-danger">*</span></label>
+                            <select name="facility_id" class="form-select" required>
+                                {% for f in facilities %}
+                                    <option value="{{ f.id }}">{{ f.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label small fw-semibold text-secondary">Kebele / Locality <span class="text-danger">*</span></label>
+                            <input type="text" name="kebele" class="form-control" placeholder="e.g. Kebele 02" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold text-secondary">Mobile Phone Number <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-telephone text-secondary"></i></span>
+                                <input type="text" name="phone" class="form-control border-start-0 ps-0" placeholder="+251911223344" required>
+                            </div>
+                            <small class="text-muted">Ethio Telecom or Safaricom format (+2519... or +2517...)</small>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label small fw-semibold text-secondary">Phone Ownership <span class="text-danger">*</span></label>
+                            <select name="phone_owner" class="form-select" required>
+                                <option value="self">Mother's Own Phone</option>
+                                <option value="spouse">Husband / Spouse</option>
+                                <option value="relative">Family / Relative</option>
+                                <option value="other">Neighbor / Other</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label small fw-semibold text-secondary">Language Preference</label>
+                            <select name="language" class="form-select">
+                                <option value="am" selected>Amharic (አማርኛ)</option>
+                                <option value="en">English</option>
+                                <option value="gurage">Gurage</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-light rounded mt-3 d-flex align-items-center gap-2 text-secondary small border">
+                        <i class="bi bi-shield-check text-success fs-5"></i>
+                        <span><strong>Shared Phone Safety:</strong> Because mobile devices are often shared in the household, automated SMS content will never disclose medical diagnosis or personal health records.</span>
+                    </div>
+                </div>
+
+                <!-- Section 2: Obstetric Dating & Ethiopian Calendar -->
+                <div class="mb-5">
+                    <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge rounded-circle p-2 bg-teal bg-opacity-10 text-teal" style="background-color: var(--app-primary-light); color: var(--app-primary);">
+                                <i class="bi bi-calendar2-heart-fill fs-6"></i>
+                            </span>
+                            <h5 class="fw-bold mb-0 text-dark">2. Last Menstrual Period (LMP) & Calendar</h5>
+                        </div>
+                        
+                        <!-- Calendar System Toggle Pills -->
+                        <div class="btn-group btn-group-sm" role="group">
+                            <input type="radio" class="btn-check" name="calendar_type" id="calEth" value="ethiopian" checked autocomplete="off" onchange="switchCalendar('ethiopian')">
+                            <label class="btn btn-outline-success" for="calEth">
+                                <i class="bi bi-calendar-event me-1"></i> Ethiopian (ዓ.ም / E.C.)
+                            </label>
+
+                            <input type="radio" class="btn-check" name="calendar_type" id="calGreg" value="gregorian" autocomplete="off" onchange="switchCalendar('gregorian')">
+                            <label class="btn btn-outline-secondary" for="calGreg">
+                                Gregorian (G.C.)
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Ethiopian Calendar Inputs (Default) -->
+                    <div id="ethiopianCalendarBlock" class="p-4 rounded border bg-light">
+                        <label class="form-label fw-bold small text-uppercase text-secondary mb-3">
+                            የመጨረሻ የወር አበባ የታየበት ቀን (LMP Date in Ethiopian Calendar):
+                        </label>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label small text-secondary">ዓመተ ምሕረት (Year)</label>
+                                <input type="number" name="eth_year" id="ethYear" class="form-control" value="{{ todayEth.year }}" min="2010" max="2030">
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label small text-secondary">ወር (Month)</label>
+                                <select name="eth_month" id="ethMonth" class="form-select">
+                                    <option value="1">1. መስከረም (Meskerem)</option>
+                                    <option value="2">2. ጥቅምት (Tikimt)</option>
+                                    <option value="3">3. ኅዳር (Hidar)</option>
+                                    <option value="4">4. ታኅሣሥ (Tahsas)</option>
+                                    <option value="5">5. ጥር (Tir)</option>
+                                    <option value="6">6. የካቲት (Yakatit)</option>
+                                    <option value="7">7. መጋቢት (Magabit)</option>
+                                    <option value="8">8. ሚያዝያ (Miyazya)</option>
+                                    <option value="9">9. ግንቦት (Ginbot)</option>
+                                    <option value="10">10. ሰኔ (Sene)</option>
+                                    <option value="11">11. ሐምሌ (Hamle)</option>
+                                    <option value="12">12. ነሐሴ (Nehase)</option>
+                                    <option value="13">13. ጳጉሜ (Pagume)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-secondary">ቀን (Day 1–30)</label>
+                                <input type="number" name="eth_day" id="ethDay" class="form-control" value="{{ todayEth.day }}" min="1" max="30">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gregorian Calendar Input (Fallback) -->
+                    <div id="gregorianCalendarBlock" class="p-4 rounded border bg-light d-none">
+                        <label class="form-label fw-bold small text-uppercase text-secondary mb-3">
+                            LMP Date (Gregorian Calendar):
+                        </label>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <input type="date" name="lmp_date" id="gregLmpDate" class="form-control" value="{{ 'now'|date('Y-m-d') }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mt-2">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold text-secondary">Clinical Risk Assessment</label>
+                            <select name="risk_status" class="form-select">
+                                <option value="low" selected>Low Risk (Standard Antenatal Pathway)</option>
+                                <option value="high">High Risk (Pre-existing conditions, prior complications)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold text-secondary">Message Tone / Study Arm</label>
+                            <select name="study_arm" class="form-select">
+                                <option value="intervention_gain" selected>Encouraging (Gain-framed benefits)</option>
+                                <option value="intervention_loss">Risk-aware (Loss-framed cautions)</option>
+                                <option value="control">Control (Routine facility care only)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Next Visit Appointment -->
+                <div class="mb-4">
+                    <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom">
+                        <span class="badge rounded-circle p-2 bg-teal bg-opacity-10 text-teal" style="background-color: var(--app-primary-light); color: var(--app-primary);">
+                            <i class="bi bi-clock-fill fs-6"></i>
+                        </span>
+                        <h5 class="fw-bold mb-0 text-dark">3. Next Antenatal Care (ANC) Visit</h5>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold text-secondary">Next Checkup Date & Time</label>
+                            <input type="datetime-local" name="next_anc_date" class="form-control">
+                            <small class="text-muted">The system will automatically schedule a 72-hour reminder SMS before this visit.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="d-flex justify-content-end align-items-center gap-2 pt-4 border-top">
+                    <a href="{{ path('app_participants_list') }}" class="btn btn-outline-secondary px-3">Cancel</a>
+                    <button type="submit" class="btn-medical px-4">
+                        <i class="bi bi-check-circle-fill"></i> Save Mother & Start SMS Stream
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function switchCalendar(type) {
+    const ethBlock = document.getElementById('ethiopianCalendarBlock');
+    const gregBlock = document.getElementById('gregorianCalendarBlock');
+    const gregInput = document.getElementById('gregLmpDate');
+
+    if (type === 'ethiopian') {
+        ethBlock.classList.remove('d-none');
+        gregBlock.classList.add('d-none');
+        gregInput.removeAttribute('required');
+    } else {
+        ethBlock.classList.add('d-none');
+        gregBlock.classList.remove('d-none');
+        gregInput.setAttribute('required', 'required');
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,16 @@
+.git
+.github
+.gitignore
+.dockerignore
+.phpunit.cache
+var/cache/*
+var/log/*
+var/data/*
+var/*.db
+vendor/
+.env.local
+.env.*.local
+tests/
+Dockerfile
+docker-compose*.yaml
+compose*.yaml

@@ -1,0 +1,146 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Mothers Registry - Maternal & Newborn Care{% endblock %}
+
+{% block body %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-4">
+    <div>
+        <h3 class="fw-bold mb-1 text-slate-900">Mothers & Participants Registry</h3>
+        <p class="text-secondary mb-0 small">Longitudinal tracking of registered pregnant and postpartum women across primary healthcare facilities.</p>
+    </div>
+    <a href="{{ path('app_participant_new') }}" class="btn-medical shadow-sm">
+        <i class="bi bi-person-plus-fill"></i> Register New Mother
+    </a>
+</div>
+
+<!-- Search & Clinical Filter Bar -->
+<div class="card-custom p-3 mb-4">
+    <form method="GET" action="{{ path('app_participants_list') }}" class="row g-2 align-items-center">
+        <div class="col-md-5">
+            <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-secondary"></i></span>
+                <input type="text" name="q" value="{{ searchQuery }}" class="form-control border-start-0 ps-0" placeholder="Search by name, ID code (e.g. MOM-), or phone number...">
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <select name="status" class="form-select">
+                <option value="">All Care Stages</option>
+                <option value="active_pregnant" {% if currentStatus == 'active_pregnant' %}selected{% endif %}>Active Pregnant</option>
+                <option value="postnatal" {% if currentStatus == 'postnatal' %}selected{% endif %}>Postnatal Care (0–6 Weeks)</option>
+                <option value="completed" {% if currentStatus == 'completed' %}selected{% endif %}>Completed (Graduated)</option>
+                <option value="opted_out" {% if currentStatus == 'opted_out' %}selected{% endif %}>Opted Out (STOP)</option>
+                <option value="loss" {% if currentStatus == 'loss' %}selected{% endif %}>Sensitive Loss Halt</option>
+            </select>
+        </div>
+
+        <div class="col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-outline-secondary w-100 fw-semibold">
+                <i class="bi bi-filter"></i> Apply Filters
+            </button>
+            {% if currentStatus or searchQuery %}
+                <a href="{{ path('app_participants_list') }}" class="btn btn-light border text-secondary">Reset</a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<!-- Table Card -->
+<div class="card-custom overflow-hidden">
+    <div class="card-header-clean bg-light d-flex justify-content-between align-items-center">
+        <span class="fw-bold text-dark">Registered Cohort ({{ participants|length }})</span>
+        <span class="text-secondary small">Wolkite & Jimma Primary Centers</span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-custom">
+            <thead>
+                <tr>
+                    <th>Mother Profile</th>
+                    <th>Facility & Kebele</th>
+                    <th>Clinical Stage</th>
+                    <th>Phone (Owner)</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in participants %}
+                    {% set preg = p.currentPregnancy %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="patient-avatar">
+                                    {{ p.fullName|slice(0, 1) }}
+                                </div>
+                                <div>
+                                    <a href="{{ path('app_participant_show', {id: p.id}) }}" class="fw-bold text-dark text-decoration-none d-block">
+                                        {{ p.fullName }}
+                                    </a>
+                                    <span class="text-muted small font-monospace">{{ p.publicCode }}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="fw-semibold text-dark small">{{ p.facility.name }}</div>
+                            <span class="text-secondary small">{{ p.kebele }}</span>
+                        </td>
+                        <td>
+                            {% if p.status == 'active_pregnant' and preg and preg.eddDate %}
+                                {% set ga = gaCalculator.calculateGestationalAge(preg.eddDate) %}
+                                <span class="badge-clinical pregnant">
+                                    <i class="bi bi-calendar3"></i> {{ ga.formatted }} (T{{ ga.trimester }})
+                                </span>
+                                <div class="small text-muted mt-1">EDD: {{ preg.eddDate|date('M d, Y') }}</div>
+                            {% elseif p.status == 'postnatal' and preg and preg.deliveredAt %}
+                                {% set pnc = gaCalculator.calculatePostnatalAge(preg.deliveredAt) %}
+                                <span class="badge-clinical postnatal">
+                                    <i class="bi bi-flower1"></i> {{ pnc.formatted }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% set ph = p.primaryPhone %}
+                            {% if ph %}
+                                <div class="small fw-semibold text-dark">{{ ph.numberE164 }}</div>
+                                <span class="badge bg-light text-secondary border small">{{ ph.ownerType|capitalize }}'s phone</span>
+                            {% else %}
+                                <span class="text-danger small">No phone recorded</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if p.status == 'active_pregnant' %}
+                                <span class="badge-clinical pregnant">Pregnant</span>
+                            {% elseif p.status == 'postnatal' %}
+                                <span class="badge-clinical postnatal">Postnatal</span>
+                            {% elseif p.status == 'completed' %}
+                                <span class="badge-clinical completed">Graduated</span>
+                            {% elseif p.status == 'opted_out' %}
+                                <span class="badge-clinical opted-out">Opted Out</span>
+                            {% elseif p.status == 'loss' %}
+                                <span class="badge-clinical missed">Sensitive Loss</span>
+                            {% else %}
+                                <span class="badge-clinical completed">{{ p.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <a href="{{ path('app_participant_show', {id: p.id}) }}" class="btn btn-sm btn-outline-secondary fw-semibold">
+                                View Profile <i class="bi bi-arrow-right ms-1"></i>
+                            </a>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-5">
+                            <i class="bi bi-people display-6 d-block mb-2 text-secondary opacity-50"></i>
+                            No enrolled mothers match this filter.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

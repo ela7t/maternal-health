@@ -1,0 +1,81 @@
+# Render Blueprint for Maternal & Newborn Health Automated SMS Platform
+# https://render.com/docs/blueprint-spec
+
+services:
+  # 1. Main Web Application
+  - type: web
+    name: mnh-web
+    env: docker
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: APP_ENV
+        value: prod
+      - key: APP_DEBUG
+        value: "0"
+      - key: APP_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mnh-db
+          property: connectionString
+      - key: SMS_LIVE
+        value: "1"
+      - key: AFROMESSAGE_BASE_URL
+        value: "https://api.afromessage.com/api"
+      - key: AFROMESSAGE_TOKEN
+        sync: false
+      - key: AFROMESSAGE_IDENTIFIER_ID
+        sync: false
+      - key: AFROMESSAGE_SENDER_NAME
+        sync: false
+      - key: CALLBACK_BASE_URL
+        sync: false
+
+  # 2. Automated 15-Minute Background SMS Scheduler
+  - type: cron
+    name: mnh-sms-scheduler
+    env: docker
+    schedule: "*/15 * * * *"
+    command: php bin/console app:scheduler:run
+    plan: starter
+    envVars:
+      - key: APP_ENV
+        value: prod
+      - key: APP_DEBUG
+        value: "0"
+      - key: APP_SECRET
+        fromService:
+          type: web
+          name: mnh-web
+          envVarKey: APP_SECRET
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mnh-db
+          property: connectionString
+      - key: SMS_LIVE
+        value: "1"
+      - key: AFROMESSAGE_BASE_URL
+        value: "https://api.afromessage.com/api"
+      - key: AFROMESSAGE_TOKEN
+        fromService:
+          type: web
+          name: mnh-web
+          envVarKey: AFROMESSAGE_TOKEN
+      - key: AFROMESSAGE_IDENTIFIER_ID
+        fromService:
+          type: web
+          name: mnh-web
+          envVarKey: AFROMESSAGE_IDENTIFIER_ID
+      - key: AFROMESSAGE_SENDER_NAME
+        fromService:
+          type: web
+          name: mnh-web
+          envVarKey: AFROMESSAGE_SENDER_NAME
+
+# 3. Managed PostgreSQL Database
+databases:
+  - name: mnh-db
+    databaseName: mnh_db
+    user: mnh_user
+    plan: free
