@@ -190,20 +190,19 @@ export default async function ParticipantShowPage({ params }: Props) {
         {/* Clinical Obstetric Card */}
         <div className="col-lg-7">
           <div className="card-custom p-4 h-100">
-            <h5 className="fw-bold mb-3 d-flex align-items-center gap-2 text-dark">
-              <i
-                className="bi bi-clipboard2-pulse text-teal"
-                style={{ color: "var(--app-primary)" }}
-              ></i>
-              <span>Obstetric & Gestational Profile</span>
+            <h5 className="fw-bold mb-3 d-flex align-items-center gap-2">
+              <i className="bi bi-clipboard2-pulse"></i>
+              <span>Obstetric &amp; gestational profile</span>
             </h5>
 
             {pregnancy ? (
               <div className="row g-3">
                 <div className="col-sm-6">
                   <div className="p-3 rounded border bg-light">
-                    <span className="text-secondary small fw-medium">Estimated Due Date (GC)</span>
-                    <div className="fs-4 fw-bold text-slate-900 mt-1">
+                    <span className="small fw-medium" style={{ color: "var(--text-secondary)" }}>
+                      Estimated due date (GC)
+                    </span>
+                    <div className="fs-4 fw-bold mt-1 tabular-nums">
                       {pregnancy.eddDate
                         ? pregnancy.eddDate.toLocaleDateString("en-US", {
                             month: "short",
@@ -212,31 +211,36 @@ export default async function ParticipantShowPage({ params }: Props) {
                           })
                         : "—"}
                     </div>
-                    <small className="text-muted">Calculated via Naegele&apos;s rule (LMP + 280d)</small>
+                    <small style={{ color: "var(--text-muted)" }}>
+                      Calculated via Naegele&apos;s rule (LMP + 280d)
+                    </small>
                   </div>
                 </div>
 
                 <div className="col-sm-6">
                   <div className="p-3 rounded border bg-light">
-                    <span className="text-secondary small fw-medium">EDD in Ethiopian Calendar (ዓ.ም)</span>
-                    <div
-                      className="fs-4 fw-bold text-teal mt-1"
-                      style={{ color: "var(--app-primary)" }}
-                    >
+                    <span className="small fw-medium" style={{ color: "var(--text-secondary)" }}>
+                      EDD in Ethiopian calendar (ዓ.ም)
+                    </span>
+                    <div className="fs-4 fw-bold mt-1 tabular-nums">
                       {eddEth?.formatted_am || "—"}
                     </div>
-                    <small className="text-muted">({eddEth?.formatted_en || "—"})</small>
+                    <small style={{ color: "var(--text-muted)" }}>
+                      ({eddEth?.formatted_en || "—"})
+                    </small>
                   </div>
                 </div>
 
                 <div className="col-sm-6">
                   <div className="p-3 rounded border bg-light">
-                    <span className="text-secondary small fw-medium">Gestational Age Status</span>
+                    <span className="small fw-medium" style={{ color: "var(--text-secondary)" }}>
+                      Gestational age status
+                    </span>
                     {gaInfo ? (
                       <>
-                        <div className="fs-5 fw-bold text-primary mt-1">{gaInfo.formatted}</div>
-                        <span className="badge bg-primary-subtle text-primary border border-primary-subtle small mt-1">
-                          Trimester {gaInfo.trimester} Active
+                        <div className="fs-5 fw-bold mt-1 tabular-nums">{gaInfo.formatted}</div>
+                        <span className="badge-clinical pregnant mt-1">
+                          Trimester {gaInfo.trimester} active
                         </span>
                       </>
                     ) : (

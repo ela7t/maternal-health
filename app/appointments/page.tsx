@@ -45,48 +45,51 @@ export default async function AppointmentsListPage({ searchParams }: Props) {
 
   return (
     <>
-      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-4">
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
         <div>
-          <h3 className="fw-bold mb-1 text-slate-900">Antenatal & Postnatal Checkups</h3>
-          <p className="text-secondary mb-0 small">
+          <h1 className="h3 fw-bold mb-1">Antenatal &amp; postnatal checkups</h1>
+          <p className="mb-0 small" style={{ color: "var(--text-secondary)" }}>
             Track scheduled clinic visits, record attendance, and follow up on missed checkups.
           </p>
         </div>
-        <div className="btn-group btn-group-sm" role="group">
+        <div className="d-flex flex-wrap gap-2" role="group" aria-label="Visit filters">
           <Link
             href="/appointments?filter=all"
-            className={`btn btn-outline-secondary ${currentFilter === "all" ? "active" : ""}`}
+            className={`btn ${currentFilter === "all" ? "btn-medical" : "btn-outline-secondary"}`}
           >
-            All Visits
+            All visits
           </Link>
           <Link
             href="/appointments?filter=today"
-            className={`btn btn-outline-secondary ${currentFilter === "today" ? "active" : ""}`}
+            className={`btn ${currentFilter === "today" ? "btn-medical" : "btn-outline-secondary"}`}
           >
-            Today&apos;s Clinic
+            Today&apos;s clinic
           </Link>
           <Link
             href="/appointments?filter=scheduled"
-            className={`btn btn-outline-secondary ${currentFilter === "scheduled" ? "active" : ""}`}
+            className={`btn ${currentFilter === "scheduled" ? "btn-medical" : "btn-outline-secondary"}`}
           >
             Upcoming (72h SMS)
           </Link>
           <Link
             href="/appointments?filter=missed"
-            className={`btn btn-outline-danger ${currentFilter === "missed" ? "active" : ""}`}
+            className={`btn ${currentFilter === "missed" ? "btn-danger" : "btn-outline-danger"}`}
           >
-            <i className="bi bi-exclamation-circle-fill me-1"></i> Missed Follow-ups
+            <i className="bi bi-exclamation-circle-fill"></i>
+            <span>Missed follow-ups</span>
           </Link>
         </div>
       </div>
 
       <div className="card-custom overflow-hidden">
-        <div className="card-header-clean bg-light d-flex justify-content-between align-items-center">
-          <span className="fw-bold text-dark">
-            <i className="bi bi-calendar2-check text-teal me-1" style={{ color: "var(--app-primary)" }}></i>{" "}
-            Visit Appointments ({appointments.length})
+        <div className="card-header-clean">
+          <span className="fw-bold tabular-nums">
+            <i className="bi bi-calendar2-check me-2"></i>
+            Visit appointments ({appointments.length})
           </span>
-          <span className="text-secondary small">72-hour reminders automated</span>
+          <span className="small" style={{ color: "var(--text-secondary)" }}>
+            72-hour reminders automated
+          </span>
         </div>
 
         <div className="table-responsive">

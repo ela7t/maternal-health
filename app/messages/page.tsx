@@ -15,14 +15,14 @@ export default async function MessageBankPage() {
     <>
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-4">
         <div>
-          <h3 className="fw-bold mb-1 text-slate-900">MNH Clinical Message Bank & Framing</h3>
-          <p className="text-secondary mb-0 small">
+          <h1 className="h3 fw-bold mb-1">MNH clinical message bank &amp; framing</h1>
+          <p className="mb-0 small" style={{ color: "var(--text-secondary)" }}>
             Validated Jimma Zone 78-message repository aligned with the WHO 8-contact ANC model and Ge&apos;ez UCS-2 segment limits.
           </p>
         </div>
         <div className="d-flex gap-2">
-          <span className="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 d-flex align-items-center gap-1">
-            <i className="bi bi-shield-check"></i> Clinically Approved
+          <span className="badge-clinical postnatal px-3 py-2">
+            <i className="bi bi-shield-check"></i> Clinically approved
           </span>
         </div>
       </div>
@@ -32,13 +32,13 @@ export default async function MessageBankPage() {
 
       {/* Message Library Table */}
       <div className="card-custom overflow-hidden">
-        <div className="card-header-clean bg-light d-flex justify-content-between align-items-center">
-          <div className="fw-bold text-dark">
-            <i className="bi bi-collection-play me-1 text-teal" style={{ color: "var(--app-primary)" }}></i>{" "}
-            Active Clinical Templates ({templates.length})
+        <div className="card-header-clean">
+          <div className="fw-bold tabular-nums">
+            <i className="bi bi-collection-play me-2"></i>
+            Active clinical templates ({templates.length})
           </div>
-          <div className="small text-secondary">
-            Gain-Framed (Benefits) vs. Loss-Framed (Risk Awareness)
+          <div className="small" style={{ color: "var(--text-secondary)" }}>
+            Gain-framed (benefits) vs. loss-framed (risk awareness)
           </div>
         </div>
 

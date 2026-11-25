@@ -33,10 +33,10 @@ export default async function OutboxListPage({ searchParams }: Props) {
 
   return (
     <>
-      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-4">
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
         <div>
-          <h3 className="fw-bold mb-1 text-slate-900">Automated SMS Activity Log</h3>
-          <p className="text-secondary mb-0 small">
+          <h1 className="h3 fw-bold mb-1">Automated SMS activity log</h1>
+          <p className="mb-0 small" style={{ color: "var(--text-secondary)" }}>
             Real-time tracking of prenatal educational messages, 72-hour appointment reminders, and network delivery receipts.
           </p>
         </div>
@@ -45,33 +45,35 @@ export default async function OutboxListPage({ searchParams }: Props) {
 
       {/* Outbox Card */}
       <div className="card-custom overflow-hidden">
-        <div className="card-header-clean bg-light d-flex justify-content-between align-items-center">
+        <div className="card-header-clean">
           <div className="d-flex align-items-center gap-2">
-            <i className="bi bi-send text-teal" style={{ color: "var(--app-primary)" }}></i>
-            <span className="fw-bold text-dark">Dispatched & Scheduled Messages ({messages.length})</span>
+            <i className="bi bi-send"></i>
+            <span className="fw-bold tabular-nums">
+              Dispatched &amp; scheduled messages ({messages.length})
+            </span>
           </div>
-          <div className="btn-group btn-group-sm">
+          <div className="d-flex flex-wrap gap-2">
             <Link
               href="/outbox"
-              className={`btn btn-outline-secondary ${!currentStatus ? "active" : ""}`}
+              className={`btn ${!currentStatus ? "btn-medical" : "btn-outline-secondary"}`}
             >
               All
             </Link>
             <Link
               href="/outbox?status=submitted"
-              className={`btn btn-outline-secondary ${currentStatus === "submitted" ? "active" : ""}`}
+              className={`btn ${currentStatus === "submitted" ? "btn-medical" : "btn-outline-secondary"}`}
             >
               Delivered
             </Link>
             <Link
               href="/outbox?status=pending"
-              className={`btn btn-outline-secondary ${currentStatus === "pending" ? "active" : ""}`}
+              className={`btn ${currentStatus === "pending" ? "btn-medical" : "btn-outline-secondary"}`}
             >
               Queued
             </Link>
             <Link
               href="/outbox?status=failed"
-              className={`btn btn-outline-danger ${currentStatus === "failed" ? "active" : ""}`}
+              className={`btn ${currentStatus === "failed" ? "btn-danger" : "btn-outline-danger"}`}
             >
               Failed
             </Link>
