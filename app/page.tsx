@@ -380,44 +380,69 @@ export default async function TodayPage() {
                     </div>
                   </div>
 
-                  {/* Gestational Week 12-42 Tracker */}
+                  {/* Gestational Week 12-42 Tracker (Exact clinical.css classes) */}
                   {gaWeeks !== null && pct !== null && (
-                    <div className="gt-wrapper">
-                      <div className="gt-desktop-view">
-                        <div className="continuum-scale-bar">
-                          <div
-                            className="continuum-scale-fill"
-                            style={{ width: `${pct}%` }}
-                          />
-                          {ancWeeks.map((wk) => {
-                            const tickPct = ((wk - 12) / 30) * 100;
-                            const isPast = wk <= gaWeeks;
-                            return (
-                              <div
-                                key={wk}
-                                className={`gt-tick ${isPast ? "is-attended" : "is-upcoming"}`}
-                                style={{ left: `${tickPct}%` }}
-                                title={`Week ${wk}`}
-                              >
-                                <span className="gt-tick-dot">
-                                  {isPast ? "✓" : ""}
-                                </span>
-                                <span className="gt-tick-label tabular-nums">{wk}w</span>
-                              </div>
-                            );
-                          })}
-                          <div className="gt-here-pin" style={{ left: `${pct}%` }}>
-                            <span className="gt-here-badge tabular-nums">Week {gaInfo?.weeks}</span>
+                    <div className="gestational-tracker" role="region" aria-label={`Gestational week tracker: Week ${gaInfo?.weeks}`}>
+                      <div className="gt-desktop-track">
+                        <div className="gt-track-wrapper">
+                          <div className="gt-axis-labels">
+                            <span className="gt-axis-label">12w</span>
+                            <span className="gt-axis-label">20w</span>
+                            <span className="gt-axis-label">28w</span>
+                            <span className="gt-axis-label">36w</span>
+                            <span className="gt-axis-label">42w</span>
+                          </div>
+                          <div className="gt-bar-track">
+                            {[0, 13.3, 26.7, 46.7, 60, 73.3, 80, 86.7, 100].map((leftPct) => (
+                              <div key={leftPct} className="gt-tick" style={{ left: `${leftPct}%` }} />
+                            ))}
+                            <div
+                              className="gt-bar-fill"
+                              style={{ width: `clamp(4%, ${pct}%, 100%)` }}
+                            />
+                            {ancWeeks.map((wk, idx) => {
+                              const tickPct = ((wk - 12) / 30) * 100;
+                              const isPast = wk <= gaWeeks;
+                              return (
+                                <div
+                                  key={wk}
+                                  className={`gt-node-marker ${isPast ? "attended" : "upcoming"}`}
+                                  style={{ left: `${tickPct}%` }}
+                                  title={`ANC ${idx + 1}: ${wk}w`}
+                                >
+                                  {isPast ? (
+                                    <svg className="gt-node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                      <polyline points="20 6 9 17 4 12" />
+                                    </svg>
+                                  ) : (
+                                    <span className="gt-node-idx">{idx + 1}</span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            <div className="gt-current-pin" style={{ left: `clamp(6%, ${pct}%, 94%)` }}>
+                              <span className="gt-pin-badge tabular-nums">Week {gaInfo?.weeks}</span>
+                            </div>
                           </div>
                         </div>
                       </div>
+
                       <div className="gt-mobile-view">
-                        <div className="gt-mobile-bar">
-                          <div className="gt-mobile-fill" style={{ width: `${pct}%` }} />
+                        <div className="gt-mobile-progress-bar">
+                          <div className="gt-mobile-progress-fill" style={{ width: `clamp(5%, ${pct}%, 100%)` }} />
                         </div>
-                        <div className="gt-mobile-text tabular-nums">
-                          Week {gaInfo?.weeks} of 42 &bull; Next checkup{" "}
-                          {apt.scheduledFor.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        <div className="gt-mobile-text-line">
+                          <span className="gt-mobile-ga tabular-nums">
+                            <strong>Week {gaInfo?.weeks}</strong> of 42
+                          </span>
+                          <span className="gt-mobile-divider">&bull;</span>
+                          <span className="gt-mobile-next tabular-nums">
+                            Next:{" "}
+                            {apt.scheduledFor.toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
                         </div>
                       </div>
                     </div>

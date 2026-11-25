@@ -17,7 +17,6 @@ export function ParticipantActions({
   const [showLossModal, setShowLossModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Delivery form state
   const [deliveryDate, setDeliveryDate] = useState(() => {
     const d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -25,8 +24,6 @@ export function ParticipantActions({
   });
   const [deliveryPlace, setDeliveryPlace] = useState(facilityName);
   const [babyName, setBabyName] = useState("");
-
-  // Loss form state
   const [lossOutcome, setLossOutcome] = useState("miscarriage");
 
   const handleDelivery = async (e: React.FormEvent) => {
@@ -98,15 +95,16 @@ export function ParticipantActions({
 
   return (
     <>
-      <div className="d-flex flex-wrap gap-2">
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
         {status === "active_pregnant" && (
           <button
             type="button"
-            className="btn btn-success d-flex align-items-center gap-1 shadow-sm"
+            className="btn btn-primary"
+            style={{ minHeight: "44px", padding: "0 16px" }}
             onClick={() => setShowDeliveryModal(true)}
             disabled={submitting}
           >
-            <i className="bi bi-gift-fill"></i> Record Delivery
+            Record delivery
           </button>
         )}
 
@@ -114,19 +112,21 @@ export function ParticipantActions({
           <>
             <button
               type="button"
-              className="btn btn-outline-danger btn-sm d-flex align-items-center gap-1"
+              className="btn btn-outline"
+              style={{ minHeight: "44px", color: "var(--status-urgent-text)", borderColor: "var(--status-urgent-border)" }}
               onClick={() => setShowLossModal(true)}
               disabled={submitting}
             >
-              <i className="bi bi-heartbreak"></i> Sensitive Loss
+              Sensitive loss
             </button>
             <button
               type="button"
               onClick={handleOptOut}
               disabled={submitting}
-              className="btn btn-outline-warning btn-sm d-flex align-items-center gap-1"
+              className="btn btn-outline"
+              style={{ minHeight: "44px" }}
             >
-              <i className="bi bi-slash-circle"></i> Opt-Out
+              Opt-out
             </button>
           </>
         )}
@@ -135,75 +135,82 @@ export function ParticipantActions({
       {/* Modal: Record Delivery */}
       {showDeliveryModal && (
         <div
-          className="modal fade show d-block"
-          tabIndex={-1}
-          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          className="modal-backdrop"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowDeliveryModal(false);
+          }}
         >
-          <div className="modal-dialog">
-            <div className="modal-content border-0 shadow">
-              <form onSubmit={handleDelivery}>
-                <div className="modal-header border-bottom">
-                  <h5 className="modal-title fw-bold text-dark">
-                    <i className="bi bi-gift-fill text-success me-2"></i>Record Birth & Delivery
-                  </h5>
-                  <button
-                    type="button"
-                    className="btn-close"
-                    onClick={() => setShowDeliveryModal(false)}
-                  ></button>
-                </div>
-                <div className="modal-body p-4">
-                  <p className="text-secondary small mb-3">
-                    Recording delivery automatically concludes antenatal pregnancy messages and starts the 6-week postnatal newborn care stream.
-                  </p>
-                  <div className="mb-3">
-                    <label className="form-label small fw-semibold text-secondary">Delivery Date & Time</label>
-                    <input
-                      type="datetime-local"
-                      className="form-control"
-                      value={deliveryDate}
-                      onChange={(e) => setDeliveryDate(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label small fw-semibold text-secondary">Delivery Location</label>
-                    <select
-                      className="form-select"
-                      value={deliveryPlace}
-                      onChange={(e) => setDeliveryPlace(e.target.value)}
-                    >
-                      <option value={facilityName}>{facilityName} (Facility Delivery)</option>
-                      <option value="Home Delivery">Home Delivery</option>
-                      <option value="In Transit">In Transit</option>
-                      <option value="Other Facility">Other Facility</option>
-                    </select>
-                  </div>
-                  <div className="mb-2">
-                    <label className="form-label small fw-semibold text-secondary">Baby Name / Code</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="e.g. Baby Dawit"
-                      value={babyName}
-                      onChange={(e) => setBabyName(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="modal-footer border-top bg-light">
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary"
-                    onClick={() => setShowDeliveryModal(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button type="submit" disabled={submitting} className="btn btn-success fw-bold">
-                    {submitting ? "Saving..." : "Confirm Delivery & Switch Stream"}
-                  </button>
-                </div>
-              </form>
-            </div>
+          <div className="card modal-content" style={{ maxWidth: "480px", width: "100%", padding: "24px" }}>
+            <form onSubmit={handleDelivery}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                <h3 style={{ margin: 0, fontSize: "1.125rem", fontWeight: 700, color: "var(--text-primary)" }}>
+                  Record birth &amp; delivery
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowDeliveryModal(false)}
+                  className="btn btn-outline"
+                  style={{ minHeight: "44px", minWidth: "44px", padding: 0 }}
+                  aria-label="Close modal"
+                >
+                  &times;
+                </button>
+              </div>
+              <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginBottom: "16px" }}>
+                Recording delivery concludes antenatal pregnancy messages and initiates the 6-week postnatal newborn care stream.
+              </p>
+              <div className="form-group">
+                <label className="form-label">Delivery date &amp; time</label>
+                <input
+                  type="datetime-local"
+                  className="form-input"
+                  value={deliveryDate}
+                  onChange={(e) => setDeliveryDate(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Delivery location</label>
+                <select
+                  className="form-select"
+                  value={deliveryPlace}
+                  onChange={(e) => setDeliveryPlace(e.target.value)}
+                >
+                  <option value={facilityName}>{facilityName} (Facility delivery)</option>
+                  <option value="Home Delivery">Home delivery</option>
+                  <option value="In Transit">In transit</option>
+                  <option value="Other Facility">Other facility</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Baby name / code</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Baby Dawit"
+                  value={babyName}
+                  onChange={(e) => setBabyName(e.target.value)}
+                />
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "18px" }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{ minHeight: "44px" }}
+                  onClick={() => setShowDeliveryModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="btn btn-primary"
+                  style={{ minHeight: "44px" }}
+                >
+                  {submitting ? "Saving..." : "Confirm delivery"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -211,55 +218,62 @@ export function ParticipantActions({
       {/* Modal: Record Sensitive Loss */}
       {showLossModal && (
         <div
-          className="modal fade show d-block"
-          tabIndex={-1}
-          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          className="modal-backdrop"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowLossModal(false);
+          }}
         >
-          <div className="modal-dialog">
-            <div className="modal-content border-danger shadow">
-              <form onSubmit={handleLoss}>
-                <div className="modal-header bg-danger text-white">
-                  <h5 className="modal-title fw-bold">
-                    <i className="bi bi-exclamation-triangle-fill me-2"></i>Emergency Sensitive Loss Halt
-                  </h5>
-                  <button
-                    type="button"
-                    className="btn-close btn-close-white"
-                    onClick={() => setShowLossModal(false)}
-                  ></button>
-                </div>
-                <div className="modal-body p-4">
-                  <p className="text-danger fw-semibold small mb-3">
-                    To protect the mother and family from severe distress, this immediately halts all automated SMS messages and creates an audit flag for supportive human follow-up.
-                  </p>
-                  <div className="mb-2">
-                    <label className="form-label small fw-semibold text-secondary">Classification of Loss</label>
-                    <select
-                      className="form-select"
-                      value={lossOutcome}
-                      onChange={(e) => setLossOutcome(e.target.value)}
-                      required
-                    >
-                      <option value="miscarriage">Early Miscarriage</option>
-                      <option value="stillbirth">Stillbirth</option>
-                      <option value="neonatal_death">Neonatal Mortality</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="modal-footer border-top bg-light">
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary"
-                    onClick={() => setShowLossModal(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button type="submit" disabled={submitting} className="btn btn-danger fw-bold">
-                    {submitting ? "Processing..." : "Confirm & Halt All Automated Messages"}
-                  </button>
-                </div>
-              </form>
-            </div>
+          <div className="card modal-content" style={{ maxWidth: "480px", width: "100%", padding: "24px", borderColor: "var(--status-urgent-border)" }}>
+            <form onSubmit={handleLoss}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                <h3 style={{ margin: 0, fontSize: "1.125rem", fontWeight: 700, color: "var(--status-urgent-text)" }}>
+                  Emergency sensitive loss halt
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowLossModal(false)}
+                  className="btn btn-outline"
+                  style={{ minHeight: "44px", minWidth: "44px", padding: 0 }}
+                  aria-label="Close modal"
+                >
+                  &times;
+                </button>
+              </div>
+              <p style={{ fontSize: "0.875rem", color: "var(--status-urgent-text)", marginBottom: "16px" }}>
+                This immediately halts all automated SMS messages and flags the participant for supportive human follow-up.
+              </p>
+              <div className="form-group">
+                <label className="form-label">Classification of loss</label>
+                <select
+                  className="form-select"
+                  value={lossOutcome}
+                  onChange={(e) => setLossOutcome(e.target.value)}
+                  required
+                >
+                  <option value="miscarriage">Early miscarriage</option>
+                  <option value="stillbirth">Stillbirth</option>
+                  <option value="neonatal_death">Neonatal mortality</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "18px" }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{ minHeight: "44px" }}
+                  onClick={() => setShowLossModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="btn btn-primary"
+                  style={{ minHeight: "44px", backgroundColor: "#dc2626", borderColor: "#dc2626", color: "#ffffff" }}
+                >
+                  {submitting ? "Processing..." : "Confirm & halt all SMS"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
