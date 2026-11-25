@@ -291,7 +291,7 @@ export default async function ReportsPage({ searchParams }: Props) {
       kpis={{
         activeWomen,
         ancOnTimePct: pct(attendedAnc, ancApts.length),
-        ancAttended,
+        ancAttended: attendedAnc,
         ancTotal: ancApts.length,
         facilityBirthPct: pct(facilityBirths, deliveredPregs.length),
         facilityBirths,
