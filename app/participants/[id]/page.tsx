@@ -130,7 +130,6 @@ export default async function ParticipantShowPage({ params }: Props) {
               babies: pregnancy.babies.map((b) => ({
                 id: b.id,
                 name: b.name,
-                sex: b.sex,
                 status: b.status,
               })),
             }

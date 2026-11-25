@@ -16,7 +16,6 @@ export interface SerializedAppointment {
 export interface SerializedBaby {
   id: number;
   name: string | null;
-  sex: string | null;
   status: string;
 }
 
