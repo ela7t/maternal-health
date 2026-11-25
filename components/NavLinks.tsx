@@ -48,8 +48,6 @@ export function NavLinks() {
   const isDirectory =
     pathname.startsWith("/participants") || pathname.startsWith("/mothers");
   const isDashboard = pathname.startsWith("/dashboard");
-  const isVisits =
-    pathname.startsWith("/appointments") || pathname.startsWith("/visits");
   const isSmsLog =
     pathname.startsWith("/outbox") || pathname.startsWith("/activity");
   const isTemplates = pathname.startsWith("/messages");
@@ -85,13 +83,6 @@ export function NavLinks() {
           <line x1="6" y1="20" x2="6" y2="14" />
         </svg>
         <span>{t.dashboard}</span>
-      </Link>
-
-      <Link href="/appointments" className={`nav-item ${isVisits ? "active" : ""}`}>
-        <svg className="icon-svg sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-        </svg>
-        <span>{t.visits}</span>
       </Link>
 
       <Link href="/outbox" className={`nav-item ${isSmsLog ? "active" : ""}`}>

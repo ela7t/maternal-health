@@ -19,6 +19,105 @@ function getRelativeDayLabel(targetDate: Date, now: Date): string {
   return `is in ${diffDays} days`;
 }
 
+const ANC_WEEKS = [16, 20, 26, 30, 34, 36, 38, 42];
+
+function getAgeYears(dob: Date | null | undefined, now: Date): number | null {
+  if (!dob) return null;
+  return Math.floor((now.getTime() - dob.getTime()) / (1000 * 3600 * 24 * 365.25));
+}
+
+function GestationalTracker({
+  eddDate,
+  calloutLabel,
+}: {
+  eddDate: Date | null | undefined;
+  calloutLabel: string;
+}) {
+  if (!eddDate) return null;
+  const gaInfo = calculateGestationalAge(eddDate);
+  if (!gaInfo) return null;
+  const gaWeeks = Math.min(42, Math.max(12, gaInfo.weeks));
+  const pct = ((gaWeeks - 12) / 30) * 100;
+
+  return (
+    <div className="priority-center gestational-tracker-col">
+      <div
+        className="gestational-tracker"
+        role="region"
+        aria-label={`Gestational week tracker: Week ${gaInfo.weeks}`}
+      >
+        <div className="gt-desktop-track">
+          <div className="gt-track-wrapper">
+            <div className="gt-axis-labels">
+              <span className="gt-axis-label">12w</span>
+              <span className="gt-axis-label">20w</span>
+              <span className="gt-axis-label">28w</span>
+              <span className="gt-axis-label">36w</span>
+              <span className="gt-axis-label">42w</span>
+            </div>
+            <div className="gt-bar-track">
+              {[0, 13.3, 26.7, 46.7, 60, 73.3, 80, 86.7, 100].map((leftPct) => (
+                <div key={leftPct} className="gt-tick" style={{ left: `${leftPct}%` }} />
+              ))}
+              <div className="gt-bar-fill" style={{ width: `clamp(4%, ${pct}%, 100%)` }} />
+              {ANC_WEEKS.map((wk, idx) => {
+                const tickPct = ((wk - 12) / 30) * 100;
+                const isPast = wk <= gaWeeks;
+                return (
+                  <div
+                    key={wk}
+                    className={`gt-node-marker ${isPast ? "attended" : "upcoming"}`}
+                    style={{ left: `${tickPct}%` }}
+                    title={`ANC ${idx + 1}: ${wk}w`}
+                  >
+                    {isPast ? (
+                      <svg
+                        className="gt-node-icon"
+                        width="11"
+                        height="11"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      <span className="gt-node-idx">{idx + 1}</span>
+                    )}
+                  </div>
+                );
+              })}
+              <div className="gt-current-pin" style={{ left: `clamp(6%, ${pct}%, 94%)` }}>
+                <span className="gt-pin-badge tabular-nums">Week {gaInfo.weeks}</span>
+              </div>
+            </div>
+            <div
+              className="gt-next-callout tabular-nums"
+              style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "8px" }}
+            >
+              {calloutLabel}
+            </div>
+          </div>
+        </div>
+
+        <div className="gt-mobile-view">
+          <div className="gt-mobile-progress-bar">
+            <div className="gt-mobile-progress-fill" style={{ width: `clamp(5%, ${pct}%, 100%)` }} />
+          </div>
+          <div className="gt-mobile-text-line">
+            <span className="gt-mobile-ga tabular-nums">
+              <strong>Week {gaInfo.weeks}</strong> of 42
+            </span>
+            <span className="gt-mobile-divider">&bull;</span>
+            <span className="gt-mobile-next tabular-nums">{calloutLabel}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default async function TodayPage() {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -42,6 +141,11 @@ export default async function TodayPage() {
           include: {
             facility: true,
             phones: { where: { isPrimary: true } },
+            outboxMessages: {
+              where: { status: { in: ["sent", "delivered", "submitted"] } },
+              orderBy: { sentAt: "desc" },
+              take: 1,
+            },
           },
         },
       },
@@ -61,6 +165,11 @@ export default async function TodayPage() {
             facility: true,
             phones: { where: { isPrimary: true } },
             pregnancies: { orderBy: { id: "desc" }, take: 1 },
+            outboxMessages: {
+              where: { status: { in: ["sent", "delivered", "submitted"] } },
+              orderBy: { sentAt: "desc" },
+              take: 1,
+            },
           },
         },
       },
@@ -103,8 +212,6 @@ export default async function TodayPage() {
     day: "numeric",
     year: "numeric",
   });
-
-  const ancWeeks = [16, 20, 26, 30, 34, 36, 38, 42];
 
   return (
     <div className="today-container">
@@ -259,26 +366,48 @@ export default async function TodayPage() {
             <div className="priority-cards-list">
               {missingOutcomes.map((preg) => {
                 const daysPast = Math.max(1, Math.floor((now.getTime() - preg.eddDate.getTime()) / (1000 * 3600 * 24)));
+                const dobAge = getAgeYears(preg.participant.dateOfBirth, now);
+                const lastSms = preg.participant.outboxMessages[0];
+                const eddLabel = preg.eddDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
                 return (
-                  <div key={preg.id} className="priority-row-card" style={{ borderLeft: "3px solid var(--status-urgent-accent)" }}>
+                  <div key={preg.id} className="priority-row-card">
                     <div className="priority-left">
-                      <div className="patient-header-line">
-                        <Link href={`/participants/${preg.participant.id}`} className="patient-name-link">
+                      <div className="patient-meta-line">
+                        <Link href={`/participants/${preg.participant.id}`} className="patient-name">
                           {preg.participant.fullName}
                         </Link>
-                        <span className="badge badge-urgent tabular-nums">Past EDD ({daysPast}d)</span>
+                        {dobAge !== null && <span className="patient-age">{dobAge} years</span>}
+                        <span className={`badge ${preg.riskStatus === "high" ? "badge-urgent" : "badge-success"}`}>
+                          {preg.riskStatus === "high" ? "High risk" : "✓ Standard"}
+                        </span>
                         <span className="mrn-badge tabular-nums">{preg.participant.publicCode}</span>
                       </div>
-                      <div className="patient-meta-line">
-                        <span>{formatKebele(preg.participant.kebele)}</span>
-                        <span>&bull;</span>
-                        <span>{preg.participant.facility.name}</span>
-                        <span>&bull;</span>
-                        <span className="tabular-nums">
-                          EDD {preg.eddDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                        </span>
+
+                      <div className="priority-alert-line alert-red">
+                        <svg className="alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="8" x2="12" y2="12" />
+                          <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        <span>Birth outcome overdue ({daysPast}d past EDD)</span>
                       </div>
+
+                      <div className="priority-sub-line">
+                        EDD {preg.eddDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })} &bull; {formatKebele(preg.participant.kebele)}
+                      </div>
+
+                      {lastSms?.sentAt && (
+                        <div className="priority-sms-line">
+                          <span className="sms-icon-check">✓</span>
+                          <span>
+                            Reminder delivered {lastSms.sentAt.toLocaleDateString("en-US", { month: "long", day: "numeric" })}
+                          </span>
+                        </div>
+                      )}
                     </div>
+
+                    <GestationalTracker eddDate={preg.eddDate} calloutLabel={`EDD: ${eddLabel}`} />
+
                     <div className="priority-right">
                       <Link href={`/participants/${preg.participant.id}`} className="btn btn-primary" style={{ minHeight: "44px" }}>
                         Record birth
@@ -316,35 +445,54 @@ export default async function TodayPage() {
             </div>
             <div className="priority-cards-list">
               {missedAppointments.map((apt) => {
-                const ph = apt.participant.phones[0];
+                const preg = apt.participant.pregnancies[0];
+                const dobAge = getAgeYears(apt.participant.dateOfBirth, now);
+                const lastSms = apt.participant.outboxMessages[0];
+                const daysAgo = Math.max(1, Math.floor((startOfToday.getTime() - apt.scheduledFor.getTime()) / (1000 * 3600 * 24)));
+                const dueShort = apt.scheduledFor.toLocaleDateString("en-US", { month: "short", day: "numeric" });
                 return (
-                  <div key={apt.id} className="priority-row-card" style={{ borderLeft: "3px solid var(--status-urgent-accent)" }}>
+                  <div key={apt.id} className="priority-row-card">
                     <div className="priority-left">
-                      <div className="patient-header-line">
-                        <Link href={`/participants/${apt.participant.id}`} className="patient-name-link">
+                      <div className="patient-meta-line">
+                        <Link href={`/participants/${apt.participant.id}`} className="patient-name">
                           {apt.participant.fullName}
                         </Link>
-                        <span className="badge badge-urgent">
-                          {apt.kind === "anc" ? "ANC Missed" : "PNC Missed"}
+                        {dobAge !== null && <span className="patient-age">{dobAge} years</span>}
+                        <span className={`badge ${preg?.riskStatus === "high" ? "badge-urgent" : "badge-success"}`}>
+                          {preg?.riskStatus === "high" ? "High risk" : "✓ Standard"}
                         </span>
                         <span className="mrn-badge tabular-nums">{apt.participant.publicCode}</span>
                       </div>
-                      <div className="patient-meta-line">
-                        <span>{formatKebele(apt.participant.kebele)}</span>
-                        <span>&bull;</span>
-                        <span>{apt.participant.facility.name}</span>
-                        <span>&bull;</span>
-                        <span className="tabular-nums">
-                          Due {apt.scheduledFor.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                        </span>
-                        {ph && (
-                          <>
-                            <span>&bull;</span>
-                            <span className="tabular-nums">{ph.numberE164}</span>
-                          </>
-                        )}
+
+                      <div className="priority-alert-line alert-red">
+                        <svg className="alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="8" x2="12" y2="12" />
+                          <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        <span>{apt.kind === "anc" ? "Missed antenatal visit" : "Missed postnatal visit"}</span>
                       </div>
+
+                      <div className="priority-sub-line">
+                        Was due {apt.scheduledFor.toLocaleDateString("en-US", { month: "long", day: "numeric" })},{" "}
+                        <strong>{daysAgo} {daysAgo === 1 ? "day" : "days"} ago</strong> &bull; {formatKebele(apt.participant.kebele)}
+                      </div>
+
+                      {lastSms?.sentAt && (
+                        <div className="priority-sms-line">
+                          <span className="sms-icon-check">✓</span>
+                          <span>
+                            Reminder delivered {lastSms.sentAt.toLocaleDateString("en-US", { month: "long", day: "numeric" })}
+                          </span>
+                        </div>
+                      )}
                     </div>
+
+                    <GestationalTracker
+                      eddDate={preg?.eddDate}
+                      calloutLabel={`Due: ${apt.kind.toUpperCase()} (${dueShort})`}
+                    />
+
                     <div className="priority-right">
                       <Link href="/appointments?filter=missed" className="btn btn-primary" style={{ minHeight: "44px" }}>
                         Review &amp; reschedule
@@ -383,27 +531,19 @@ export default async function TodayPage() {
           <div className="priority-cards-list">
             {visitsThisWeek.map((apt) => {
               const preg = apt.participant.pregnancies[0];
-              const gaInfo = preg?.eddDate ? calculateGestationalAge(preg.eddDate) : null;
-              const gaWeeks = gaInfo ? Math.min(42, Math.max(12, gaInfo.weeks)) : null;
-              const pct = gaWeeks !== null ? ((gaWeeks - 12) / 30) * 100 : null;
               const lastSms = apt.participant.outboxMessages[0];
-              const dobAge = apt.participant.dateOfBirth
-                ? Math.floor((now.getTime() - apt.participant.dateOfBirth.getTime()) / (1000 * 3600 * 24 * 365.25))
-                : null;
+              const dobAge = getAgeYears(apt.participant.dateOfBirth, now);
+              const dueShort = apt.scheduledFor.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
               return (
                 <div key={apt.id} className="priority-row-card">
                   {/* Left: Patient info */}
                   <div className="priority-left">
-                    <div className="patient-header-line">
-                      <Link href={`/participants/${apt.participant.id}`} className="patient-name-link">
+                    <div className="patient-meta-line">
+                      <Link href={`/participants/${apt.participant.id}`} className="patient-name">
                         {apt.participant.fullName}
                       </Link>
-                      {dobAge !== null && (
-                        <span className="tabular-nums" style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
-                          {dobAge} years
-                        </span>
-                      )}
+                      {dobAge !== null && <span className="patient-age">{dobAge} years</span>}
                       <span className={`badge ${preg?.riskStatus === "high" ? "badge-urgent" : "badge-success"}`}>
                         {preg?.riskStatus === "high" ? "High risk" : "✓ Standard"}
                       </span>
@@ -421,7 +561,7 @@ export default async function TodayPage() {
                       </strong>
                     </div>
 
-                    <div className="patient-meta-line">
+                    <div className="priority-sub-line">
                       <span className="tabular-nums">
                         {apt.scheduledFor.toLocaleDateString("en-US", {
                           weekday: "long",
@@ -430,88 +570,29 @@ export default async function TodayPage() {
                         })}{" "}
                         at 9:00 AM
                       </span>
-                      <span>&bull;</span>
+                      {" "}&bull;{" "}
                       <span>{formatKebele(apt.participant.kebele)}</span>
                     </div>
 
                     {lastSms?.sentAt && (
-                      <div className="patient-sms-line" style={{ color: "var(--status-success-text)", fontSize: "0.75rem", marginTop: "4px" }}>
-                        ✓ Reminder delivered{" "}
-                        {lastSms.sentAt.toLocaleDateString("en-US", {
-                          month: "long",
-                          day: "numeric",
-                        })}
+                      <div className="priority-sms-line">
+                        <span className="sms-icon-check">✓</span>
+                        <span>
+                          Reminder delivered{" "}
+                          {lastSms.sentAt.toLocaleDateString("en-US", {
+                            month: "long",
+                            day: "numeric",
+                          })}
+                        </span>
                       </div>
                     )}
                   </div>
 
                   {/* Center: Gestational Week 12-42 Tracker */}
-                  {gaWeeks !== null && pct !== null && (
-                    <div className="priority-center gestational-tracker-col">
-                      <div className="gestational-tracker" role="region" aria-label={`Gestational week tracker: Week ${gaInfo?.weeks}`}>
-                        <div className="gt-desktop-track">
-                          <div className="gt-track-wrapper">
-                            <div className="gt-axis-labels">
-                              <span className="gt-axis-label">12w</span>
-                              <span className="gt-axis-label">20w</span>
-                              <span className="gt-axis-label">28w</span>
-                              <span className="gt-axis-label">36w</span>
-                              <span className="gt-axis-label">42w</span>
-                            </div>
-                            <div className="gt-bar-track">
-                              {[0, 13.3, 26.7, 46.7, 60, 73.3, 80, 86.7, 100].map((leftPct) => (
-                                <div key={leftPct} className="gt-tick" style={{ left: `${leftPct}%` }} />
-                              ))}
-                              <div className="gt-bar-fill" style={{ width: `clamp(4%, ${pct}%, 100%)` }} />
-                              {ancWeeks.map((wk, idx) => {
-                                const tickPct = ((wk - 12) / 30) * 100;
-                                const isPast = wk <= gaWeeks;
-                                return (
-                                  <div
-                                    key={wk}
-                                    className={`gt-node-marker ${isPast ? "attended" : "upcoming"}`}
-                                    style={{ left: `${tickPct}%` }}
-                                    title={`ANC ${idx + 1}: ${wk}w`}
-                                  >
-                                    {isPast ? (
-                                      <svg className="gt-node-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                        <polyline points="20 6 9 17 4 12" />
-                                      </svg>
-                                    ) : (
-                                      <span className="gt-node-idx">{idx + 1}</span>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                              <div className="gt-current-pin" style={{ left: `clamp(6%, ${pct}%, 94%)` }}>
-                                <span className="gt-pin-badge tabular-nums">Week {gaInfo?.weeks}</span>
-                              </div>
-                            </div>
-                            <div className="gt-next-callout tabular-nums" style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "8px" }}>
-                              Due: {apt.kind.toUpperCase()} (
-                              {apt.scheduledFor.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                              )
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="gt-mobile-view">
-                          <div className="gt-mobile-progress-bar">
-                            <div className="gt-mobile-progress-fill" style={{ width: `clamp(5%, ${pct}%, 100%)` }} />
-                          </div>
-                          <div className="gt-mobile-text-line">
-                            <span className="gt-mobile-ga tabular-nums">
-                              <strong>Week {gaInfo?.weeks}</strong> of 42
-                            </span>
-                            <span className="gt-mobile-divider">&bull;</span>
-                            <span className="gt-mobile-next tabular-nums">
-                              Due {apt.scheduledFor.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  <GestationalTracker
+                    eddDate={preg?.eddDate}
+                    calloutLabel={`Due: ${apt.kind.toUpperCase()} (${dueShort})`}
+                  />
 
                   {/* Right: Record visit CTA */}
                   <div className="priority-right">
