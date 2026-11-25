@@ -14,6 +14,22 @@ interface EthDate {
   day: number;
 }
 
+const ETH_MONTHS = [
+  "Meskerem (መስከረም)",
+  "Tikimt (ጥቅምት)",
+  "Hidar (ህዳር)",
+  "Tahsas (ታህሳስ)",
+  "Tir (ጥር)",
+  "Yakatit (የካቲት)",
+  "Megabit (መጋቢት)",
+  "Miyazya (ሚያዝያ)",
+  "Ginbot (ግንቦት)",
+  "Sene (ሰኔ)",
+  "Hamle (ሐምሌ)",
+  "Nehase (ነሐሴ)",
+  "Pagume (ጳጉሜ)",
+];
+
 export function RegisterMotherForm({
   facilities,
   todayEth,
@@ -22,17 +38,23 @@ export function RegisterMotherForm({
   todayEth: EthDate;
 }) {
   const router = useRouter();
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [calendarType, setCalendarType] = useState<"ethiopian" | "gregorian">("ethiopian");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Step 1: Identity & language
   const [fullName, setFullName] = useState("");
   const [facilityId, setFacilityId] = useState(facilities[0]?.id ? String(facilities[0].id) : "");
   const [kebele, setKebele] = useState("");
-  const [phone, setPhone] = useState("");
-  const [phoneOwner, setPhoneOwner] = useState("self");
   const [language, setLanguage] = useState("am");
 
+  // Step 2: Contact & consent
+  const [phone, setPhone] = useState("");
+  const [phoneOwner, setPhoneOwner] = useState("self");
+  const [smsConsent, setSmsConsent] = useState(true);
+
+  // Step 3: Dating & schedule
   const [ethYear, setEthYear] = useState(todayEth.year);
   const [ethMonth, setEthMonth] = useState(todayEth.month);
   const [ethDay, setEthDay] = useState(todayEth.day);
@@ -40,6 +62,27 @@ export function RegisterMotherForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!fullName.trim()) {
+      setStep(1);
+      setError("Full name is required.");
+      return;
+    }
+    if (!phone.trim()) {
+      setStep(2);
+      setError("Primary phone number is required.");
+      return;
+    }
+    if (!smsConsent) {
+      setStep(2);
+      setError("Verbal or written SMS consent must be confirmed before enrollment.");
+      return;
+    }
+    if (calendarType === "gregorian" && !gregDate) {
+      setStep(3);
+      setError("Please select the Last Menstrual Period (LMP) date.");
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
@@ -69,242 +112,323 @@ export function RegisterMotherForm({
 
       router.push(`/participants/${data.id}`);
       router.refresh();
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
       setSubmitting(false);
     }
   };
 
   return (
     <form onSubmit={handleSubmit}>
+      {/* Django 3-Step Clinical Stepper */}
+      <div className="stepper" style={{ marginBottom: "1.75rem" }}>
+        {[
+          { num: 1 as const, label: "Identity & language" },
+          { num: 2 as const, label: "Contact & consent" },
+          { num: 3 as const, label: "Dating & schedule" },
+        ].map((s) => (
+          <div
+            key={s.num}
+            className={`step-item ${step === s.num ? "active" : step > s.num ? "completed" : ""}`}
+            onClick={() => setStep(s.num)}
+            style={{ cursor: "pointer", minHeight: "44px" }}
+          >
+            <div className="step-circle">{step > s.num ? "✓" : s.num}</div>
+            <div className="step-label">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
       {error && (
         <div className="alert-box alert-danger" style={{ marginBottom: "1.25rem" }}>
           <div>{error}</div>
         </div>
       )}
 
-      {/* Section 1: Demographics & Contact */}
-      <div style={{ marginBottom: "2rem" }}>
-        <div style={{ paddingBottom: "0.625rem", marginBottom: "1.25rem", borderBottom: "1px solid var(--border-color)" }}>
-          <h2 style={{ fontSize: "1.0625rem", fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>
-            1. Mother&apos;s identification &amp; contact
+      {/* STEP 1: Identity & Language */}
+      {step === 1 && (
+        <div>
+          <h2 style={{ fontSize: "1.0625rem", fontWeight: 700, margin: "0 0 1.25rem", color: "var(--text-primary)" }}>
+            Participant Demographics &amp; Preferences
           </h2>
-        </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
           <div className="form-group">
             <label className="form-label">
-              Full name of mother <span className="required">*</span>
+              Full Name <span className="required">*</span>
             </label>
             <input
               type="text"
               className="form-input"
-              placeholder="e.g. Tigist Haile"
+              required
+              placeholder="Participant full legal or clinical name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              required
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">
-              Health facility <span className="required">*</span>
-            </label>
-            <select
-              className="form-select"
-              value={facilityId}
-              onChange={(e) => setFacilityId(e.target.value)}
-              required
-            >
-              {facilities.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
+            <div className="form-group">
+              <label className="form-label">
+                Assigned Health Facility <span className="required">*</span>
+              </label>
+              <select
+                className="form-select"
+                value={facilityId}
+                onChange={(e) => setFacilityId(e.target.value)}
+              >
+                {facilities.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Kebele / Residence</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. Kebele 03"
+                value={kebele}
+                onChange={(e) => setKebele(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">
+                Preferred SMS Language <span className="required">*</span>
+              </label>
+              <select
+                className="form-select"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+              >
+                <option value="am">Amharic (አማርኛ)</option>
+                <option value="en">English</option>
+                <option value="gurage">Gurage</option>
+              </select>
+            </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">
-              Kebele / locality <span className="required">*</span>
-            </label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="e.g. Kebele 02"
-              value={kebele}
-              onChange={(e) => setKebele(e.target.value)}
-              required
-            />
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1.5rem" }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ minHeight: "44px", padding: "0 20px" }}
+              onClick={() => {
+                if (!fullName.trim()) {
+                  setError("Please enter the mother's full name.");
+                  return;
+                }
+                setError(null);
+                setStep(2);
+              }}
+            >
+              Next: Contact &amp; consent &rarr;
+            </button>
           </div>
         </div>
+      )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
-          <div className="form-group">
-            <label className="form-label">
-              Mobile phone number <span className="required">*</span>
-            </label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="+251911223344"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              required
-            />
-            <div className="form-hint">Ethio Telecom (+2519...) or Safaricom (+2517...)</div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">
-              Phone ownership <span className="required">*</span>
-            </label>
-            <select
-              className="form-select"
-              value={phoneOwner}
-              onChange={(e) => setPhoneOwner(e.target.value)}
-              required
-            >
-              <option value="self">Mother&apos;s own phone</option>
-              <option value="spouse">Husband / spouse</option>
-              <option value="relative">Family / relative</option>
-              <option value="other">Neighbor / other</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">SMS language preference</label>
-            <select
-              className="form-select"
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-            >
-              <option value="am">Amharic (አማርኛ)</option>
-              <option value="en">English</option>
-              <option value="gurage">Gurage</option>
-            </select>
-          </div>
-        </div>
-
-        <div style={{ background: "var(--bg-subtle)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: "0.875rem 1rem", fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
-          <strong>Shared phone safety:</strong> Automated SMS messages never disclose medical diagnoses or personal health records.
-        </div>
-      </div>
-
-      {/* Section 2: Obstetric Dating & Ethiopian Calendar */}
-      <div style={{ marginBottom: "2rem" }}>
-        <div className="cal-toggle-wrap" style={{ marginBottom: "1rem" }}>
-          <h2 style={{ fontSize: "1.0625rem", fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>
-            2. Last menstrual period (LMP) &amp; calendar
+      {/* STEP 2: Contact & Consent */}
+      {step === 2 && (
+        <div>
+          <h2 style={{ fontSize: "1.0625rem", fontWeight: 700, margin: "0 0 1.25rem", color: "var(--text-primary)" }}>
+            Telephony &amp; SMS Consent
           </h2>
 
-          <div className="cal-toggle-group" role="group" aria-label="Calendar system selector">
-            <button
-              type="button"
-              className={`cal-toggle-btn ${calendarType === "ethiopian" ? "active" : ""}`}
-              style={{ minHeight: "44px" }}
-              onClick={() => setCalendarType("ethiopian")}
-            >
-              Ethiopian (ዓ.ም / E.C.)
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
+            <div className="form-group">
+              <label className="form-label">
+                Primary Phone Number (Ethiopia E.164) <span className="required">*</span>
+              </label>
+              <input
+                type="tel"
+                className="form-input"
+                required
+                placeholder="+251911223344 or 0911223344"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+              <div className="form-hint">Used for automated 72h visit reminders &amp; weekly maternal education.</div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Phone Ownership</label>
+              <select
+                className="form-select"
+                value={phoneOwner}
+                onChange={(e) => setPhoneOwner(e.target.value)}
+              >
+                <option value="self">Own phone</option>
+                <option value="husband">Husband&apos;s phone</option>
+                <option value="family">Family / Relative phone</option>
+              </select>
+            </div>
+          </div>
+
+          <div
+            style={{
+              marginTop: "0.5rem",
+              padding: "1rem",
+              background: "var(--bg-subtle)",
+              border: "1px solid var(--border-color)",
+              borderRadius: "var(--radius-md)",
+            }}
+          >
+            <label style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={smsConsent}
+                onChange={(e) => setSmsConsent(e.target.checked)}
+                style={{ marginTop: "3px", width: "18px", height: "18px" }}
+              />
+              <span style={{ fontSize: "0.875rem", color: "var(--text-primary)", lineHeight: 1.45 }}>
+                <strong>Informed SMS Consent Confirmed</strong>
+                <span style={{ display: "block", color: "var(--text-secondary)", fontSize: "0.8125rem", marginTop: "2px" }}>
+                  Participant verbally consented to receive non-diagnostic antenatal/postnatal SMS reminders (reply STOP / አቁም to opt out at any time).
+                </span>
+              </span>
+            </label>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "1.5rem", gap: "0.75rem" }}>
+            <button type="button" className="btn btn-outline" style={{ minHeight: "44px" }} onClick={() => setStep(1)}>
+              &larr; Back
             </button>
             <button
               type="button"
-              className={`cal-toggle-btn ${calendarType === "gregorian" ? "active" : ""}`}
-              style={{ minHeight: "44px" }}
-              onClick={() => setCalendarType("gregorian")}
+              className="btn btn-primary"
+              style={{ minHeight: "44px", padding: "0 20px" }}
+              onClick={() => {
+                if (!phone.trim()) {
+                  setError("Please enter a phone number.");
+                  return;
+                }
+                if (!smsConsent) {
+                  setError("Please confirm informed SMS consent.");
+                  return;
+                }
+                setError(null);
+                setStep(3);
+              }}
             >
-              Gregorian (G.C.)
+              Next: Dating &amp; schedule &rarr;
             </button>
           </div>
         </div>
+      )}
 
-        {calendarType === "ethiopian" ? (
-          <div className="ethiopian-picker-card">
-            <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.75rem" }}>
-              የመጨረሻ የወር አበባ የታየበት ቀን (LMP date in Ethiopian calendar)
-            </div>
-            <div className="ethiopian-date-grid">
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">ቀን (Day 1&ndash;30)</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  value={ethDay}
-                  onChange={(e) => setEthDay(Number(e.target.value))}
-                  min={1}
-                  max={30}
-                  required
-                />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">ወር (Month)</label>
-                <select
-                  className="form-select"
-                  value={ethMonth}
-                  onChange={(e) => setEthMonth(Number(e.target.value))}
-                >
-                  <option value={1}>1. መስከረም (Meskerem)</option>
-                  <option value={2}>2. ጥቅምት (Tikimt)</option>
-                  <option value={3}>3. ኅዳር (Hidar)</option>
-                  <option value={4}>4. ታኅሣሥ (Tahsas)</option>
-                  <option value={5}>5. ጥር (Tir)</option>
-                  <option value={6}>6. የካቲት (Yakatit)</option>
-                  <option value={7}>7. መጋቢት (Magabit)</option>
-                  <option value={8}>8. ሚያዝያ (Miyazya)</option>
-                  <option value={9}>9. ግንቦት (Ginbot)</option>
-                  <option value={10}>10. ሰኔ (Sene)</option>
-                  <option value={11}>11. ሐምሌ (Hamle)</option>
-                  <option value={12}>12. ነሐሴ (Nehase)</option>
-                  <option value={13}>13. ጳጉሜ (Pagume)</option>
-                </select>
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">ዓመተ ምሕረት (Year)</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  value={ethYear}
-                  onChange={(e) => setEthYear(Number(e.target.value))}
-                  min={2010}
-                  max={2030}
-                  required
-                />
-              </div>
+      {/* STEP 3: Clinical Dating & Schedule */}
+      {step === 3 && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem", marginBottom: "1.25rem" }}>
+            <h2 style={{ fontSize: "1.0625rem", fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>
+              Last Menstrual Period (LMP) &amp; WHO Schedule
+            </h2>
+            <div className="cal-toggle-group" role="group" aria-label="Calendar system">
+              <button
+                type="button"
+                className={`cal-toggle-btn ${calendarType === "ethiopian" ? "active" : ""}`}
+                style={{ minHeight: "40px" }}
+                onClick={() => setCalendarType("ethiopian")}
+              >
+                Ethiopian (ዓ.ም)
+              </button>
+              <button
+                type="button"
+                className={`cal-toggle-btn ${calendarType === "gregorian" ? "active" : ""}`}
+                style={{ minHeight: "40px" }}
+                onClick={() => setCalendarType("gregorian")}
+              >
+                Gregorian (GC)
+              </button>
             </div>
           </div>
-        ) : (
-          <div className="ethiopian-picker-card">
-            <label className="form-label">First day of last menstrual period (Gregorian)</label>
-            <input
-              type="date"
-              className="form-input"
-              style={{ maxWidth: "320px" }}
-              value={gregDate}
-              onChange={(e) => setGregDate(e.target.value)}
-              required
-            />
-          </div>
-        )}
-      </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem", paddingTop: "1rem", borderTop: "1px solid var(--border-color)" }}>
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="btn btn-outline"
-          style={{ minHeight: "44px" }}
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={submitting}
-          className="btn btn-primary"
-          style={{ minHeight: "44px", padding: "0 20px" }}
-        >
-          {submitting ? "Enrolling mother..." : "Complete registration & schedule reminders"}
-        </button>
-      </div>
+          {calendarType === "ethiopian" ? (
+            <div className="ethiopian-picker-card" style={{ padding: "1rem", marginBottom: "1rem" }}>
+              <div className="ethiopian-date-grid">
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Year (ዓ.ም)</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={ethYear}
+                    onChange={(e) => setEthYear(Number(e.target.value))}
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Month</label>
+                  <select
+                    className="form-select"
+                    value={ethMonth}
+                    onChange={(e) => setEthMonth(Number(e.target.value))}
+                  >
+                    {ETH_MONTHS.map((m, idx) => (
+                      <option key={m} value={idx + 1}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Day</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    min={1}
+                    max={30}
+                    value={ethDay}
+                    onChange={(e) => setEthDay(Number(e.target.value))}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="form-group">
+              <label className="form-label">
+                LMP Date (Gregorian) <span className="required">*</span>
+              </label>
+              <input
+                type="date"
+                className="form-input"
+                value={gregDate}
+                onChange={(e) => setGregDate(e.target.value)}
+                required
+              />
+            </div>
+          )}
+
+          <div
+            style={{
+              padding: "0.875rem 1rem",
+              background: "var(--bg-subtle)",
+              border: "1px solid var(--border-color)",
+              borderRadius: "var(--radius-md)",
+              fontSize: "0.8125rem",
+              color: "var(--text-secondary)",
+            }}
+          >
+            Enrolling automatically computes the Expected Delivery Date (EDD), creates the 8-contact WHO 2016 ANC schedule, and queues 72-hour SMS reminders.
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "1.5rem", gap: "0.75rem" }}>
+            <button type="button" className="btn btn-outline" style={{ minHeight: "44px" }} onClick={() => setStep(2)}>
+              &larr; Back
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              style={{ minHeight: "44px", padding: "0 22px", fontWeight: 600 }}
+              disabled={submitting}
+            >
+              {submitting ? "Enrolling..." : "Complete Enrollment"}
+            </button>
+          </div>
+        </div>
+      )}
     </form>
   );
 }
