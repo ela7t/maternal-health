@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { calculateGestationalAge } from "@/lib/ethiopianCalendar";
-import { SyncSchedulerButton } from "@/components/SyncSchedulerButton";
 
 export const dynamic = "force-dynamic";
 
@@ -11,21 +10,26 @@ function formatKebele(raw: string | null | undefined): string {
   return cleaned ? `Kebele ${cleaned}` : "—";
 }
 
+function getRelativeDayLabel(targetDate: Date, now: Date): string {
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startTarget = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+  const diffDays = Math.round((startTarget.getTime() - startToday.getTime()) / (1000 * 3600 * 24));
+  if (diffDays === 0) return "is today";
+  if (diffDays === 1) return "is tomorrow";
+  return `is in ${diffDays} days`;
+}
+
 export default async function TodayPage() {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const nextWeek = new Date(startOfToday.getTime() + 7 * 24 * 3600 * 1000);
 
   const [
-    activeCount,
     missingOutcomes,
     missedAppointments,
     visitsThisWeek,
     failedSmsCount,
   ] = await Promise.all([
-    prisma.participant.count({
-      where: { status: { in: ["active_pregnant", "postnatal"] } },
-    }),
     prisma.pregnancy.findMany({
       where: {
         deliveredAt: null,
@@ -74,6 +78,11 @@ export default async function TodayPage() {
             facility: true,
             phones: { where: { isPrimary: true } },
             pregnancies: { orderBy: { id: "desc" }, take: 1 },
+            outboxMessages: {
+              where: { status: { in: ["sent", "delivered", "submitted"] } },
+              orderBy: { sentAt: "desc" },
+              take: 1,
+            },
           },
         },
       },
@@ -86,6 +95,8 @@ export default async function TodayPage() {
   const missingCount = missingOutcomes.length;
   const missedCount = missedAppointments.length;
   const visitsDueCount = visitsThisWeek.length;
+  const totalPriorityItems = missingCount + missedCount + visitsDueCount + failedSmsCount;
+
   const formattedToday = now.toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -93,23 +104,21 @@ export default async function TodayPage() {
     year: "numeric",
   });
 
-  const ancWeeks = [16, 20, 26, 30, 34, 36, 38, 40];
+  const ancWeeks = [16, 20, 26, 30, 34, 36, 38, 42];
 
   return (
     <div className="today-container">
-      {/* Header: Exact Django today.html */}
+      {/* Header matching Django screenshot */}
       <div className="today-header-row">
         <div>
           <h1 className="today-main-title">Today&apos;s priorities</h1>
           <p className="today-subtitle">
-            {formattedToday} &bull;{" "}
-            <span className="tabular-nums">{activeCount}</span> mothers assigned to you
+            {formattedToday} &bull; mothers assigned to you
           </p>
         </div>
-        <div style={{ display: "flex", gap: "0.625rem", flexWrap: "wrap", alignItems: "center" }}>
-          <SyncSchedulerButton />
+        <div>
           <Link href="/participants/new" className="btn btn-primary btn-enroll-action">
-            <svg className="icon-svg sm" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg className="icon-svg sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -118,16 +127,15 @@ export default async function TodayPage() {
         </div>
       </div>
 
-      {/* 4 Actionable Triage Metric Cards (Exact Django today.html order) */}
+      {/* 4 Actionable Triage Metric Cards */}
       <div className="today-metrics-grid" role="region" aria-label="Triage metric categories">
-        {/* 1. Birth outcomes */}
         <a
           href="#sec-missing-outcomes"
           className={`today-metric-card ${missingCount === 0 ? "is-zero" : "has-urgent"}`}
         >
           <div className="metric-card-top">
             <div className="metric-big-num tabular-nums">{missingCount}</div>
-            <svg className="metric-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="metric-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </div>
@@ -146,14 +154,13 @@ export default async function TodayPage() {
           </div>
         </a>
 
-        {/* 2. Missed visits */}
         <a
           href="#sec-missed-visits"
           className={`today-metric-card ${missedCount === 0 ? "is-zero" : "has-urgent"}`}
         >
           <div className="metric-card-top">
             <div className="metric-big-num tabular-nums">{missedCount}</div>
-            <svg className="metric-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="metric-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </div>
@@ -172,14 +179,13 @@ export default async function TodayPage() {
           </div>
         </a>
 
-        {/* 3. Visits this week */}
         <a
           href="#sec-visits-due"
           className={`today-metric-card ${visitsDueCount === 0 ? "is-zero" : ""}`}
         >
           <div className="metric-card-top">
             <div className="metric-big-num tabular-nums">{visitsDueCount}</div>
-            <svg className="metric-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="metric-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </div>
@@ -188,18 +194,17 @@ export default async function TodayPage() {
             <span>Visits this week</span>
           </div>
           <div className="metric-subtext">
-            {visitsDueCount > 0 ? "Scheduled next 7 days" : "No upcoming visits this week"}
+            {visitsDueCount > 0 ? "Planned clinical contacts" : "No upcoming visits this week"}
           </div>
         </a>
 
-        {/* 4. Phone problems */}
         <a
           href="#sec-phone-problems"
           className={`today-metric-card ${failedSmsCount === 0 ? "is-zero" : "has-urgent"}`}
         >
           <div className="metric-card-top">
             <div className="metric-big-num tabular-nums">{failedSmsCount}</div>
-            <svg className="metric-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="metric-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </div>
@@ -214,9 +219,19 @@ export default async function TodayPage() {
             <span>Phone problems</span>
           </div>
           <div className="metric-subtext">
-            {failedSmsCount > 0 ? "SMS delivery failures" : "All lines reachable"}
+            {failedSmsCount > 0 ? "SMS delivery failures" : "All telephone lines working"}
           </div>
         </a>
+      </div>
+
+      {/* Sub-bar matching screenshot */}
+      <div className="today-subbar">
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+          <span>
+            Showing <strong className="tabular-nums">{totalPriorityItems}</strong> priority{" "}
+            {totalPriorityItems === 1 ? "item" : "items"}
+          </span>
+        </div>
       </div>
 
       {/* SECTION 1: Birth outcomes */}
@@ -224,11 +239,11 @@ export default async function TodayPage() {
         {missingCount === 0 ? (
           <div className="zero-section-collapsed">
             <div className="zero-section-left">
-              <svg className="icon-svg sm" width="18" height="18" style={{ color: "var(--status-success-accent)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <svg className="icon-svg sm" width="16" height="16" style={{ color: "var(--status-success-accent)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
               <span className="zero-section-title">Birth outcomes</span>
-              <span style={{ color: "var(--text-muted)" }}>All birth outcomes logged</span>
+              <span style={{ color: "var(--text-muted)" }}>&bull; All birth outcomes logged</span>
             </div>
             <span className="zero-section-pill tabular-nums">0</span>
           </div>
@@ -236,14 +251,10 @@ export default async function TodayPage() {
           <div>
             <div className="section-header-row">
               <div className="section-title-wrap">
-                <svg className="icon-svg sm" width="18" height="18" style={{ color: "var(--status-urgent-accent)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
                 <span>Birth outcomes</span>
                 <span className="section-count-badge tabular-nums">{missingCount}</span>
               </div>
+              <span className="section-right-notice">Past EDD without recorded delivery</span>
             </div>
             <div className="priority-cards-list">
               {missingOutcomes.map((preg) => {
@@ -251,32 +262,24 @@ export default async function TodayPage() {
                 return (
                   <div key={preg.id} className="priority-row-card" style={{ borderLeft: "3px solid var(--status-urgent-accent)" }}>
                     <div className="priority-left">
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "6px" }}>
-                        <Link
-                          href={`/participants/${preg.participant.id}`}
-                          style={{ fontWeight: 700, fontSize: "1rem", color: "var(--text-primary)", textDecoration: "none" }}
-                        >
+                      <div className="patient-header-line">
+                        <Link href={`/participants/${preg.participant.id}`} className="patient-name-link">
                           {preg.participant.fullName}
                         </Link>
-                        <span className="mrn-badge tabular-nums">{preg.participant.publicCode}</span>
                         <span className="badge badge-urgent tabular-nums">Past EDD ({daysPast}d)</span>
+                        <span className="mrn-badge tabular-nums">{preg.participant.publicCode}</span>
                       </div>
-                      <div className="patient-meta-line" style={{ display: "flex", gap: "8px", flexWrap: "wrap", color: "var(--text-secondary)", fontSize: "0.8125rem" }}>
+                      <div className="patient-meta-line">
                         <span>{formatKebele(preg.participant.kebele)}</span>
                         <span>&bull;</span>
                         <span>{preg.participant.facility.name}</span>
                         <span>&bull;</span>
                         <span className="tabular-nums">
-                          EDD{" "}
-                          {preg.eddDate.toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })}
+                          EDD {preg.eddDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                         </span>
                       </div>
                     </div>
-                    <div className="priority-right" style={{ flexShrink: 0 }}>
+                    <div className="priority-right">
                       <Link href={`/participants/${preg.participant.id}`} className="btn btn-primary" style={{ minHeight: "44px" }}>
                         Record birth
                       </Link>
@@ -294,11 +297,11 @@ export default async function TodayPage() {
         {missedCount === 0 ? (
           <div className="zero-section-collapsed">
             <div className="zero-section-left">
-              <svg className="icon-svg sm" width="18" height="18" style={{ color: "var(--status-success-accent)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <svg className="icon-svg sm" width="16" height="16" style={{ color: "var(--status-success-accent)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
               <span className="zero-section-title">Missed visits</span>
-              <span style={{ color: "var(--text-muted)" }}>All scheduled appointments attended on time</span>
+              <span style={{ color: "var(--text-muted)" }}>&bull; All visits attended on time</span>
             </div>
             <span className="zero-section-pill tabular-nums">0</span>
           </div>
@@ -306,14 +309,10 @@ export default async function TodayPage() {
           <div>
             <div className="section-header-row">
               <div className="section-title-wrap">
-                <svg className="icon-svg sm" width="18" height="18" style={{ color: "var(--status-urgent-accent)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-                <span>Missed visits requiring follow-up</span>
+                <span>Missed visits</span>
                 <span className="section-count-badge tabular-nums">{missedCount}</span>
               </div>
+              <span className="section-right-notice">Requires phone follow-up</span>
             </div>
             <div className="priority-cards-list">
               {missedAppointments.map((apt) => {
@@ -321,29 +320,22 @@ export default async function TodayPage() {
                 return (
                   <div key={apt.id} className="priority-row-card" style={{ borderLeft: "3px solid var(--status-urgent-accent)" }}>
                     <div className="priority-left">
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "6px" }}>
-                        <Link
-                          href={`/participants/${apt.participant.id}`}
-                          style={{ fontWeight: 700, fontSize: "1rem", color: "var(--text-primary)", textDecoration: "none" }}
-                        >
+                      <div className="patient-header-line">
+                        <Link href={`/participants/${apt.participant.id}`} className="patient-name-link">
                           {apt.participant.fullName}
                         </Link>
-                        <span className="mrn-badge tabular-nums">{apt.participant.publicCode}</span>
                         <span className="badge badge-urgent">
                           {apt.kind === "anc" ? "ANC Missed" : "PNC Missed"}
                         </span>
+                        <span className="mrn-badge tabular-nums">{apt.participant.publicCode}</span>
                       </div>
-                      <div className="patient-meta-line" style={{ display: "flex", gap: "8px", flexWrap: "wrap", color: "var(--text-secondary)", fontSize: "0.8125rem" }}>
+                      <div className="patient-meta-line">
                         <span>{formatKebele(apt.participant.kebele)}</span>
                         <span>&bull;</span>
                         <span>{apt.participant.facility.name}</span>
                         <span>&bull;</span>
                         <span className="tabular-nums">
-                          Due{" "}
-                          {apt.scheduledFor.toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                          })}
+                          Due {apt.scheduledFor.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                         </span>
                         {ph && (
                           <>
@@ -353,12 +345,8 @@ export default async function TodayPage() {
                         )}
                       </div>
                     </div>
-                    <div className="priority-right" style={{ flexShrink: 0 }}>
-                      <Link
-                        href="/appointments?filter=missed"
-                        className="btn btn-primary"
-                        style={{ minHeight: "44px" }}
-                      >
+                    <div className="priority-right">
+                      <Link href="/appointments?filter=missed" className="btn btn-primary" style={{ minHeight: "44px" }}>
                         Review &amp; reschedule
                       </Link>
                     </div>
@@ -370,29 +358,24 @@ export default async function TodayPage() {
         )}
       </section>
 
-      {/* SECTION 3: Visits this week (With Gestational Week 12-42 Tracker) */}
+      {/* SECTION 3: Visits this week (Exact 3-column card matching Django screenshot) */}
       <section id="sec-visits-due" className="priority-section">
         <div className="section-header-row">
           <div className="section-title-wrap">
-            <svg className="icon-svg sm" width="18" height="18" style={{ color: "var(--text-secondary)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
             <span>Visits this week</span>
             <span className="section-count-badge tabular-nums">{visitsDueCount}</span>
           </div>
+          <span className="section-right-notice">Scheduled contacts planned over the next 7 days</span>
         </div>
 
         {visitsDueCount === 0 ? (
           <div className="zero-section-collapsed">
             <div className="zero-section-left">
-              <svg className="icon-svg sm" width="18" height="18" style={{ color: "var(--status-success-accent)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <svg className="icon-svg sm" width="16" height="16" style={{ color: "var(--status-success-accent)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
               <span className="zero-section-title">Visits this week</span>
-              <span style={{ color: "var(--text-muted)" }}>No clinic visits scheduled in the next 7 days</span>
+              <span style={{ color: "var(--text-muted)" }}>&bull; No clinic visits scheduled over the next 7 days</span>
             </div>
             <span className="zero-section-pill tabular-nums">0</span>
           </div>
@@ -403,42 +386,66 @@ export default async function TodayPage() {
               const gaInfo = preg?.eddDate ? calculateGestationalAge(preg.eddDate) : null;
               const gaWeeks = gaInfo ? Math.min(42, Math.max(12, gaInfo.weeks)) : null;
               const pct = gaWeeks !== null ? ((gaWeeks - 12) / 30) * 100 : null;
+              const lastSms = apt.participant.outboxMessages[0];
+              const dobAge = apt.participant.dateOfBirth
+                ? Math.floor((now.getTime() - apt.participant.dateOfBirth.getTime()) / (1000 * 3600 * 24 * 365.25))
+                : null;
 
               return (
-                <div key={apt.id} className="priority-row-card" style={{ flexWrap: "wrap" }}>
+                <div key={apt.id} className="priority-row-card">
+                  {/* Left: Patient info */}
                   <div className="priority-left">
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "6px" }}>
-                      <Link
-                        href={`/participants/${apt.participant.id}`}
-                        style={{ fontWeight: 700, fontSize: "1rem", color: "var(--text-primary)", textDecoration: "none" }}
-                      >
+                    <div className="patient-header-line">
+                      <Link href={`/participants/${apt.participant.id}`} className="patient-name-link">
                         {apt.participant.fullName}
                       </Link>
-                      <span className="mrn-badge tabular-nums">{apt.participant.publicCode}</span>
-                      <span className={`badge ${apt.kind === "anc" ? "badge-info" : "badge-success"}`}>
-                        {apt.kind === "anc" ? "ANC Visit" : "PNC Visit"}
-                      </span>
-                      {gaInfo && (
-                        <span className="badge badge-neutral tabular-nums">
-                          {gaInfo.formatted}
+                      {dobAge !== null && (
+                        <span className="tabular-nums" style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
+                          {dobAge} years
                         </span>
                       )}
+                      <span className={`badge ${preg?.riskStatus === "high" ? "badge-urgent" : "badge-success"}`}>
+                        {preg?.riskStatus === "high" ? "High risk" : "✓ Standard"}
+                      </span>
+                      <span className="mrn-badge tabular-nums">{apt.participant.publicCode}</span>
                     </div>
-                    <div className="patient-meta-line" style={{ display: "flex", gap: "8px", flexWrap: "wrap", color: "var(--text-secondary)", fontSize: "0.8125rem" }}>
-                      <span>{formatKebele(apt.participant.kebele)}</span>
-                      <span>&bull;</span>
-                      <span>{apt.participant.facility.name}</span>
-                      <span>&bull;</span>
+
+                    <div className="patient-action-line">
+                      <svg className="icon-svg xs" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                      <strong>
+                        {apt.kind === "anc" ? "Antenatal visit" : "Postnatal visit"}{" "}
+                        {getRelativeDayLabel(apt.scheduledFor, now)}
+                      </strong>
+                    </div>
+
+                    <div className="patient-meta-line">
                       <span className="tabular-nums">
                         {apt.scheduledFor.toLocaleDateString("en-US", {
-                          weekday: "short",
-                          month: "short",
+                          weekday: "long",
+                          month: "long",
+                          day: "numeric",
+                        })}{" "}
+                        at 9:00 AM
+                      </span>
+                      <span>&bull;</span>
+                      <span>{formatKebele(apt.participant.kebele)}</span>
+                    </div>
+
+                    {lastSms?.sentAt && (
+                      <div className="patient-sms-line" style={{ color: "var(--status-success-text)", fontSize: "0.75rem", marginTop: "4px" }}>
+                        ✓ Reminder delivered{" "}
+                        {lastSms.sentAt.toLocaleDateString("en-US", {
+                          month: "long",
                           day: "numeric",
                         })}
-                      </span>
-                    </div>
+                      </div>
+                    )}
                   </div>
 
+                  {/* Center: Gestational Week 12-42 Tracker */}
                   {gaWeeks !== null && pct !== null && (
                     <div className="priority-center gestational-tracker-col">
                       <div className="gestational-tracker" role="region" aria-label={`Gestational week tracker: Week ${gaInfo?.weeks}`}>
@@ -480,6 +487,11 @@ export default async function TodayPage() {
                                 <span className="gt-pin-badge tabular-nums">Week {gaInfo?.weeks}</span>
                               </div>
                             </div>
+                            <div className="gt-next-callout tabular-nums" style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "8px" }}>
+                              Due: {apt.kind.toUpperCase()} (
+                              {apt.scheduledFor.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                              )
+                            </div>
                           </div>
                         </div>
 
@@ -493,11 +505,7 @@ export default async function TodayPage() {
                             </span>
                             <span className="gt-mobile-divider">&bull;</span>
                             <span className="gt-mobile-next tabular-nums">
-                              Next:{" "}
-                              {apt.scheduledFor.toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                              })}
+                              Due {apt.scheduledFor.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                             </span>
                           </div>
                         </div>
@@ -505,13 +513,17 @@ export default async function TodayPage() {
                     </div>
                   )}
 
-                  <div className="priority-right" style={{ flexShrink: 0 }}>
+                  {/* Right: Record visit CTA */}
+                  <div className="priority-right">
                     <Link
                       href={`/participants/${apt.participant.id}`}
                       className="btn btn-primary"
                       style={{ minHeight: "44px" }}
                     >
-                      Record visit
+                      <svg className="icon-svg sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <span>Record visit</span>
                     </Link>
                   </div>
                 </div>
@@ -526,11 +538,11 @@ export default async function TodayPage() {
         {failedSmsCount === 0 ? (
           <div className="zero-section-collapsed">
             <div className="zero-section-left">
-              <svg className="icon-svg sm" width="18" height="18" style={{ color: "var(--status-success-accent)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <svg className="icon-svg sm" width="16" height="16" style={{ color: "var(--status-success-accent)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
               <span className="zero-section-title">Phone problems</span>
-              <span style={{ color: "var(--text-muted)" }}>All participant phone numbers reachable</span>
+              <span style={{ color: "var(--text-muted)" }}>&bull; All phone numbers reachable</span>
             </div>
             <span className="zero-section-pill tabular-nums">0</span>
           </div>

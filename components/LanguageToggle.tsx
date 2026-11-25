@@ -13,8 +13,7 @@ export function LanguageToggle() {
     window.dispatchEvent(new CustomEvent("mnh-lang-change", { detail: saved }));
   }, []);
 
-  const toggle = () => {
-    const next = lang === "en" ? "am" : "en";
+  const selectLang = (next: "en" | "am") => {
     setLang(next);
     localStorage.setItem("ui_lang", next);
     document.documentElement.lang = next;
@@ -23,16 +22,22 @@ export function LanguageToggle() {
   };
 
   return (
-    <button
-      type="button"
-      onClick={toggle}
-      className="lang-toggle-btn"
-      aria-label="Toggle English / Amharic"
-      title="Switch language (EN / አማ)"
-    >
-      <span className={lang === "en" ? "lang-active" : ""}>EN</span>
-      <span className="lang-sep">/</span>
-      <span className={lang === "am" ? "lang-active" : ""}>አማ</span>
-    </button>
+    <div className={`lang-switcher ${lang === "am" ? "is-am" : "is-en"}`} role="group" aria-label="Language switcher">
+      <div className="lang-slider" />
+      <button
+        type="button"
+        onClick={() => selectLang("en")}
+        className={`lang-btn ${lang === "en" ? "active" : ""}`}
+      >
+        EN
+      </button>
+      <button
+        type="button"
+        onClick={() => selectLang("am")}
+        className={`lang-btn ${lang === "am" ? "active" : ""}`}
+      >
+        አማ
+      </button>
+    </div>
   );
 }

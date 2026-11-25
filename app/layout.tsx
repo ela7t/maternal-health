@@ -33,12 +33,11 @@ export default function RootLayout({
         />
       </head>
       <body className="app-shell">
-        {/* Single-Row Minimalist Clinical Header (Exact Django base.html Layout) */}
         <header className="app-header">
           <div className="header-container">
             <div className="header-left">
               <Link href="/" className="brand-wrapper" aria-label="Maternal SMS Home" title="Maternal & Newborn Care">
-                <svg className="brand-pulse-icon" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="brand-pulse-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
                 </svg>
                 <span className="brand-title">
@@ -53,23 +52,18 @@ export default function RootLayout({
             </div>
 
             <div className="header-actions">
-              <LanguageToggle />
               <ThemeToggle />
-              <Link href="/participants/new" className="btn btn-primary btn-enroll-primary">
-                <svg className="icon-svg sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                <span>Enroll Mother</span>
-              </Link>
+              <LanguageToggle />
+              <div className="user-chip" title="Wolkite & Jimma Primary Health Program">
+                <span className="status-dot" />
+                <span className="user-chip-name">admin</span>
+              </div>
             </div>
           </div>
         </header>
 
-        {/* Main Workspace Container */}
-        <main className="main-container">{children}</main>
+        <main className="main-content">{children}</main>
 
-        {/* Footer */}
         <footer className="app-footer">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem", maxWidth: "1280px", margin: "0 auto" }}>
             <span>
