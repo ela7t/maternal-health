@@ -116,6 +116,22 @@ function formatDatingMethod(method: string | null): string {
   return method || "LMP";
 }
 
+function getAncSlotIdx(scheduledForIso: string, eddIso: string | null | undefined): number {
+  if (!eddIso) return 0;
+  const weeksBeforeEdd = (new Date(eddIso).getTime() - new Date(scheduledForIso).getTime()) / (1000 * 3600 * 24 * 7);
+  const gaAtVisit = 40 - weeksBeforeEdd;
+  let bestIdx = 0;
+  let bestDiff = Infinity;
+  for (let i = 0; i < ANC_SCHEDULE.length; i++) {
+    const diff = Math.abs(ANC_SCHEDULE[i].week - gaAtVisit);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestIdx = i;
+    }
+  }
+  return bestIdx;
+}
+
 export function ParticipantWorkspace({
   participant,
   pregnancy,
@@ -200,10 +216,10 @@ export function ParticipantWorkspace({
       .sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime())[0] ||
     null;
 
-  const nextAncIndex = ancVisits.findIndex((a) => a.id === nextVisit?.id);
+  const nextAncSlotIdx = nextVisit?.kind === "anc" ? getAncSlotIdx(nextVisit.scheduledFor, pregnancy?.eddIso) : -1;
   const nextAncLabel =
     nextVisit?.kind === "anc"
-      ? `ANC Contact ${nextAncIndex >= 0 ? nextAncIndex + 1 : ancAttended + 1} (${ANC_SCHEDULE[Math.min(7, Math.max(0, nextAncIndex >= 0 ? nextAncIndex : ancAttended))]?.week || 30} weeks)`
+      ? `ANC Contact ${nextAncSlotIdx + 1} (${ANC_SCHEDULE[nextAncSlotIdx]?.week || 26} weeks)`
       : nextVisit
       ? `PNC Contact`
       : null;
@@ -685,7 +701,9 @@ export function ParticipantWorkspace({
 
                 <div className="continuum-stepper-track">
                   {ANC_SCHEDULE.map((node, i) => {
-                    const matchedApt = ancVisits[i];
+                    const matchedApt = ancVisits.find(
+                      (a) => getAncSlotIdx(a.scheduledFor, pregnancy?.eddIso) === i
+                    );
                     const attended = matchedApt ? matchedApt.status === "attended" : delivered;
                     const isNext = !delivered && nextVisit && matchedApt?.id === nextVisit.id;
                     return (
@@ -769,10 +787,11 @@ export function ParticipantWorkspace({
               </div>
 
               <div className="timeline">
-                {visibleAncVisits.map((visit, idx) => {
+                {visibleAncVisits.map((visit) => {
                   const isNext = nextVisit?.id === visit.id;
-                  const ancNum = ancVisits.findIndex((a) => a.id === visit.id) + 1;
-                  const targetWk = ANC_SCHEDULE[Math.min(7, Math.max(0, ancNum - 1))]?.week;
+                  const slotIdx = getAncSlotIdx(visit.scheduledFor, pregnancy?.eddIso);
+                  const ancNum = slotIdx + 1;
+                  const targetWk = ANC_SCHEDULE[slotIdx]?.week;
                   return (
                     <div
                       key={visit.id}
@@ -789,7 +808,7 @@ export function ParticipantWorkspace({
                           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
                             <span className="badge badge-info" style={{ fontSize: "0.6875rem", fontWeight: 700 }}>ANC</span>
                             <strong style={{ fontSize: "0.9375rem", color: "var(--text-primary)" }}>
-                              ANC Contact {ancNum || idx + 1} {targetWk ? `(${targetWk} weeks)` : ""}
+                              ANC Contact {ancNum} {targetWk ? `(${targetWk} weeks)` : ""}
                             </strong>
                             <span className={`badge ${visit.status === "attended" ? "badge-success" : visit.status === "missed" ? "badge-urgent" : "badge-neutral"}`} style={{ fontSize: "0.75rem" }}>
                               {visit.status === "attended" ? "Attended" : visit.status === "missed" ? "Missed" : "Planned"}

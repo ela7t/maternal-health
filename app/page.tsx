@@ -21,6 +21,36 @@ function getRelativeDayLabel(targetDate: Date, now: Date): string {
 
 const ANC_WEEKS = [16, 20, 26, 30, 34, 36, 38, 42];
 
+function getAncSlotIndex(scheduledFor: Date, eddDate: Date | null | undefined): number {
+  if (!eddDate) return 0;
+  const weeksBeforeEdd = (eddDate.getTime() - scheduledFor.getTime()) / (1000 * 3600 * 24 * 7);
+  const gaAtVisit = 40 - weeksBeforeEdd;
+  let bestIdx = 0;
+  let bestDiff = Infinity;
+  for (let i = 0; i < ANC_WEEKS.length; i++) {
+    const diff = Math.abs(ANC_WEEKS[i] - gaAtVisit);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestIdx = i;
+    }
+  }
+  return bestIdx;
+}
+
+function buildAncStatuses(
+  appointments: Array<{ id: number; scheduledFor: Date; status: string }>,
+  eddDate: Date | null | undefined,
+  overrideId?: number,
+  overrideStatus?: string
+): string[] {
+  const slots = new Array(8).fill("");
+  for (const a of appointments) {
+    const idx = getAncSlotIndex(a.scheduledFor, eddDate);
+    slots[idx] = a.id === overrideId && overrideStatus ? overrideStatus : a.status;
+  }
+  return slots;
+}
+
 function getAgeYears(dob: Date | null | undefined, now: Date): number | null {
   if (!dob) return null;
   return Math.floor((now.getTime() - dob.getTime()) / (1000 * 3600 * 24 * 365.25));
@@ -421,7 +451,7 @@ export default async function TodayPage() {
                     <GestationalTracker
                       eddDate={preg.eddDate}
                       calloutLabel={`EDD: ${eddLabel}`}
-                      ancStatuses={preg.participant.appointments.map((a) => a.status)}
+                      ancStatuses={buildAncStatuses(preg.participant.appointments, preg.eddDate)}
                     />
 
                     <div className="priority-right">
@@ -466,10 +496,12 @@ export default async function TodayPage() {
                 const lastSms = apt.participant.outboxMessages[0];
                 const daysAgo = Math.max(1, Math.floor((startOfToday.getTime() - apt.scheduledFor.getTime()) / (1000 * 3600 * 24)));
                 const dueShort = apt.scheduledFor.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                const contactIdx = apt.participant.appointments.findIndex((a) => a.id === apt.id);
-                const contactNum = contactIdx >= 0 ? contactIdx + 1 : 1;
-                const ancStatuses = apt.participant.appointments.map((a) =>
-                  a.id === apt.id ? "missed" : a.status
+                const contactNum = getAncSlotIndex(apt.scheduledFor, preg?.eddDate) + 1;
+                const ancStatuses = buildAncStatuses(
+                  apt.participant.appointments,
+                  preg?.eddDate,
+                  apt.id,
+                  "missed"
                 );
                 return (
                   <div key={apt.id} className="priority-row-card">
@@ -556,9 +588,8 @@ export default async function TodayPage() {
               const lastSms = apt.participant.outboxMessages[0];
               const dobAge = getAgeYears(apt.participant.dateOfBirth, now);
               const dueShort = apt.scheduledFor.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-              const contactIdx = apt.participant.appointments.findIndex((a) => a.id === apt.id);
-              const contactNum = contactIdx >= 0 ? contactIdx + 1 : 1;
-              const ancStatuses = apt.participant.appointments.map((a) => a.status);
+              const contactNum = getAncSlotIndex(apt.scheduledFor, preg?.eddDate) + 1;
+              const ancStatuses = buildAncStatuses(apt.participant.appointments, preg?.eddDate);
 
               return (
                 <div key={apt.id} className="priority-row-card">
