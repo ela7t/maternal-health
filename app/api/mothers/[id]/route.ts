@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { processPregnancyLoss, planSchedules } from "@/lib/scheduler/dispatcher";
 import { calculateGestationalAge, calculatePostnatalAge } from "@/lib/clinical/gestational-age";
@@ -380,6 +381,7 @@ export async function POST(
         return NextResponse.json({ error: "Phone number is required" }, { status: 400 });
       }
       const normalized = phoneNumber.trim();
+      const phoneHash = crypto.createHash("sha256").update(normalized).digest("hex");
       const existing = await prisma.participantPhone.findFirst({
         where: { participantId, isPrimary: true },
       });
@@ -388,8 +390,9 @@ export async function POST(
           where: { id: existing.id },
           data: {
             numberE164: normalized,
+            phoneHash,
             ownerType: ownerType || existing.ownerType,
-            isReachable: true,
+            failureCount: 0,
           },
         });
       } else {
@@ -397,9 +400,10 @@ export async function POST(
           data: {
             participantId,
             numberE164: normalized,
+            phoneHash,
             ownerType: ownerType || "self",
             isPrimary: true,
-            isReachable: true,
+            failureCount: 0,
           },
         });
       }
