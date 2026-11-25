@@ -78,32 +78,27 @@ export function RegisterMotherForm({
   return (
     <form onSubmit={handleSubmit}>
       {error && (
-        <div className="alert alert-danger d-flex align-items-center gap-2 mb-4">
-          <i className="bi bi-exclamation-triangle-fill"></i>
+        <div className="alert-box alert-danger" style={{ marginBottom: "1.25rem" }}>
           <div>{error}</div>
         </div>
       )}
 
-      {/* Section 1: Demographics */}
-      <div className="mb-5">
-        <div className="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom">
-          <span
-            className="badge rounded-circle p-2"
-            style={{ backgroundColor: "var(--app-primary-light)", color: "var(--app-primary)" }}
-          >
-            <i className="bi bi-person-fill fs-6"></i>
-          </span>
-          <h5 className="fw-bold mb-0 text-dark">1. Mother&apos;s Identification & Contact</h5>
+      {/* Section 1: Demographics & Contact */}
+      <div style={{ marginBottom: "2rem" }}>
+        <div style={{ paddingBottom: "0.625rem", marginBottom: "1.25rem", borderBottom: "1px solid var(--border-color)" }}>
+          <h2 style={{ fontSize: "1.0625rem", fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>
+            1. Mother&apos;s identification &amp; contact
+          </h2>
         </div>
 
-        <div className="row g-3">
-          <div className="col-md-6">
-            <label className="form-label small fw-semibold text-secondary">
-              Full Name of Mother <span className="text-danger">*</span>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
+          <div className="form-group">
+            <label className="form-label">
+              Full name of mother <span className="required">*</span>
             </label>
             <input
               type="text"
-              className="form-control"
+              className="form-input"
               placeholder="e.g. Tigist Haile"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
@@ -111,9 +106,9 @@ export function RegisterMotherForm({
             />
           </div>
 
-          <div className="col-md-3">
-            <label className="form-label small fw-semibold text-secondary">
-              Health Facility <span className="text-danger">*</span>
+          <div className="form-group">
+            <label className="form-label">
+              Health facility <span className="required">*</span>
             </label>
             <select
               className="form-select"
@@ -129,43 +124,40 @@ export function RegisterMotherForm({
             </select>
           </div>
 
-          <div className="col-md-3">
-            <label className="form-label small fw-semibold text-secondary">
-              Kebele / Locality <span className="text-danger">*</span>
+          <div className="form-group">
+            <label className="form-label">
+              Kebele / locality <span className="required">*</span>
             </label>
             <input
               type="text"
-              className="form-control"
+              className="form-input"
               placeholder="e.g. Kebele 02"
               value={kebele}
               onChange={(e) => setKebele(e.target.value)}
               required
             />
           </div>
+        </div>
 
-          <div className="col-md-6">
-            <label className="form-label small fw-semibold text-secondary">
-              Mobile Phone Number <span className="text-danger">*</span>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
+          <div className="form-group">
+            <label className="form-label">
+              Mobile phone number <span className="required">*</span>
             </label>
-            <div className="input-group">
-              <span className="input-group-text bg-light border-end-0">
-                <i className="bi bi-telephone text-secondary"></i>
-              </span>
-              <input
-                type="text"
-                className="form-control border-start-0 ps-0"
-                placeholder="+251911223344"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-              />
-            </div>
-            <small className="text-muted">Ethio Telecom or Safaricom format (+2519... or +2517...)</small>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="+251911223344"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              required
+            />
+            <div className="form-hint">Ethio Telecom (+2519...) or Safaricom (+2517...)</div>
           </div>
 
-          <div className="col-md-3">
-            <label className="form-label small fw-semibold text-secondary">
-              Phone Ownership <span className="text-danger">*</span>
+          <div className="form-group">
+            <label className="form-label">
+              Phone ownership <span className="required">*</span>
             </label>
             <select
               className="form-select"
@@ -173,15 +165,15 @@ export function RegisterMotherForm({
               onChange={(e) => setPhoneOwner(e.target.value)}
               required
             >
-              <option value="self">Mother&apos;s Own Phone</option>
-              <option value="spouse">Husband / Spouse</option>
-              <option value="relative">Family / Relative</option>
-              <option value="other">Neighbor / Other</option>
+              <option value="self">Mother&apos;s own phone</option>
+              <option value="spouse">Husband / spouse</option>
+              <option value="relative">Family / relative</option>
+              <option value="other">Neighbor / other</option>
             </select>
           </div>
 
-          <div className="col-md-3">
-            <label className="form-label small fw-semibold text-secondary">Language Preference</label>
+          <div className="form-group">
+            <label className="form-label">SMS language preference</label>
             <select
               className="form-select"
               value={language}
@@ -194,82 +186,58 @@ export function RegisterMotherForm({
           </div>
         </div>
 
-        <div className="p-3 bg-light rounded mt-3 d-flex align-items-center gap-2 text-secondary small border">
-          <i className="bi bi-shield-check text-success fs-5"></i>
-          <span>
-            <strong>Shared Phone Safety:</strong> Because mobile devices are often shared in the household,
-            automated SMS content will never disclose medical diagnosis or personal health records.
-          </span>
+        <div style={{ background: "var(--bg-subtle)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: "0.875rem 1rem", fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
+          <strong>Shared phone safety:</strong> Automated SMS messages never disclose medical diagnoses or personal health records.
         </div>
       </div>
 
       {/* Section 2: Obstetric Dating & Ethiopian Calendar */}
-      <div className="mb-5">
-        <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
-          <div className="d-flex align-items-center gap-2">
-            <span
-              className="badge rounded-circle p-2"
-              style={{ backgroundColor: "var(--app-primary-light)", color: "var(--app-primary)" }}
-            >
-              <i className="bi bi-calendar2-heart-fill fs-6"></i>
-            </span>
-            <h5 className="fw-bold mb-0 text-dark">2. Last Menstrual Period (LMP) & Calendar</h5>
-          </div>
+      <div style={{ marginBottom: "2rem" }}>
+        <div className="cal-toggle-wrap" style={{ marginBottom: "1rem" }}>
+          <h2 style={{ fontSize: "1.0625rem", fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>
+            2. Last menstrual period (LMP) &amp; calendar
+          </h2>
 
-          {/* Calendar System Toggle Pills */}
-          <div className="btn-group btn-group-sm" role="group">
-            <input
-              type="radio"
-              className="btn-check"
-              name="calendarToggle"
-              id="calEth"
-              checked={calendarType === "ethiopian"}
-              onChange={() => setCalendarType("ethiopian")}
-            />
-            <label
-              className={`btn ${calendarType === "ethiopian" ? "btn-success" : "btn-outline-secondary"}`}
-              htmlFor="calEth"
+          <div className="cal-toggle-group" role="group" aria-label="Calendar system selector">
+            <button
+              type="button"
+              className={`cal-toggle-btn ${calendarType === "ethiopian" ? "active" : ""}`}
+              style={{ minHeight: "44px" }}
+              onClick={() => setCalendarType("ethiopian")}
             >
-              <i className="bi bi-calendar-event me-1"></i> Ethiopian (ዓ.ም / E.C.)
-            </label>
-
-            <input
-              type="radio"
-              className="btn-check"
-              name="calendarToggle"
-              id="calGreg"
-              checked={calendarType === "gregorian"}
-              onChange={() => setCalendarType("gregorian")}
-            />
-            <label
-              className={`btn ${calendarType === "gregorian" ? "btn-primary" : "btn-outline-secondary"}`}
-              htmlFor="calGreg"
+              Ethiopian (ዓ.ም / E.C.)
+            </button>
+            <button
+              type="button"
+              className={`cal-toggle-btn ${calendarType === "gregorian" ? "active" : ""}`}
+              style={{ minHeight: "44px" }}
+              onClick={() => setCalendarType("gregorian")}
             >
               Gregorian (G.C.)
-            </label>
+            </button>
           </div>
         </div>
 
         {calendarType === "ethiopian" ? (
-          <div className="p-4 rounded border bg-light">
-            <label className="form-label fw-bold small text-uppercase text-secondary mb-3">
-              የመጨረሻ የወር አበባ የታየበት ቀን (LMP Date in Ethiopian Calendar):
-            </label>
-            <div className="row g-3">
-              <div className="col-md-4">
-                <label className="form-label small text-secondary">ዓመተ ምሕረት (Year)</label>
+          <div className="ethiopian-picker-card">
+            <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.75rem" }}>
+              የመጨረሻ የወር አበባ የታየበት ቀን (LMP date in Ethiopian calendar)
+            </div>
+            <div className="ethiopian-date-grid">
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">ቀን (Day 1&ndash;30)</label>
                 <input
                   type="number"
-                  className="form-control"
-                  value={ethYear}
-                  onChange={(e) => setEthYear(Number(e.target.value))}
-                  min={2010}
-                  max={2030}
+                  className="form-input"
+                  value={ethDay}
+                  onChange={(e) => setEthDay(Number(e.target.value))}
+                  min={1}
+                  max={30}
                   required
                 />
               </div>
-              <div className="col-md-5">
-                <label className="form-label small text-secondary">ወር (Month)</label>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">ወር (Month)</label>
                 <select
                   className="form-select"
                   value={ethMonth}
@@ -290,63 +258,51 @@ export function RegisterMotherForm({
                   <option value={13}>13. ጳጉሜ (Pagume)</option>
                 </select>
               </div>
-              <div className="col-md-3">
-                <label className="form-label small text-secondary">ቀን (Day 1–30)</label>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">ዓመተ ምሕረት (Year)</label>
                 <input
                   type="number"
-                  className="form-control"
-                  value={ethDay}
-                  onChange={(e) => setEthDay(Number(e.target.value))}
-                  min={1}
-                  max={30}
+                  className="form-input"
+                  value={ethYear}
+                  onChange={(e) => setEthYear(Number(e.target.value))}
+                  min={2010}
+                  max={2030}
                   required
                 />
               </div>
             </div>
           </div>
         ) : (
-          <div className="p-4 rounded border bg-light">
-            <label className="form-label fw-bold small text-uppercase text-secondary mb-3">
-              First Day of Last Menstrual Period (Gregorian):
-            </label>
-            <div className="row g-3">
-              <div className="col-md-6">
-                <input
-                  type="date"
-                  className="form-control"
-                  value={gregDate}
-                  onChange={(e) => setGregDate(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
+          <div className="ethiopian-picker-card">
+            <label className="form-label">First day of last menstrual period (Gregorian)</label>
+            <input
+              type="date"
+              className="form-input"
+              style={{ maxWidth: "320px" }}
+              value={gregDate}
+              onChange={(e) => setGregDate(e.target.value)}
+              required
+            />
           </div>
         )}
       </div>
 
-      <div className="d-flex justify-content-between align-items-center pt-3 border-top">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem", paddingTop: "1rem", borderTop: "1px solid var(--border-color)" }}>
         <button
           type="button"
           onClick={() => router.back()}
-          className="btn btn-outline-secondary"
+          className="btn btn-outline"
+          style={{ minHeight: "44px" }}
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={submitting}
-          className="btn-medical px-4 py-2"
+          className="btn btn-primary"
+          style={{ minHeight: "44px", padding: "0 20px" }}
         >
-          {submitting ? (
-            <>
-              <span className="spinner-border spinner-border-sm me-2" role="status"></span>
-              Enrolling Mother...
-            </>
-          ) : (
-            <>
-              <i className="bi bi-check-lg"></i> Complete Registration & Schedule Reminders
-            </>
-          )}
+          {submitting ? "Enrolling mother..." : "Complete registration & schedule reminders"}
         </button>
       </div>
     </form>

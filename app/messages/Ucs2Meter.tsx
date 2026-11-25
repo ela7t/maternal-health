@@ -22,64 +22,60 @@ export function Ucs2Meter() {
   const pct = Math.min(100, Math.round((currentInSeg / maxInSegment) * 100));
 
   return (
-    <div className="card-custom p-4 mb-4">
-      <div className="d-flex justify-content-between align-items-start mb-3">
-        <div>
-          <h5 className="fw-bold mb-1 text-dark d-flex align-items-center gap-2">
-            <i className="bi bi-chat-text text-teal" style={{ color: "var(--app-primary)" }}></i>
-            <span>Interactive Ge&apos;ez / Amharic SMS Length & Billing Meter</span>
-          </h5>
-          <p className="text-secondary small mb-0">
-            Ethio Telecom and Safaricom bill Ge&apos;ez text under{" "}
-            <strong>UCS-2 encoding (70 characters per segment)</strong> instead of 160 characters for English. Test any draft below:
-          </p>
-        </div>
+    <div className="card" style={{ padding: "1.5rem" }}>
+      <div style={{ marginBottom: "1rem" }}>
+        <h2 style={{ fontSize: "1.0625rem", fontWeight: 700, color: "var(--text-primary)", margin: "0 0 0.25rem 0" }}>
+          Interactive Ge&apos;ez / Amharic SMS length &amp; billing meter
+        </h2>
+        <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", margin: 0 }}>
+          Ethio Telecom and Safaricom bill Ge&apos;ez text under{" "}
+          <strong>UCS-2 encoding (70 characters per segment)</strong> instead of 160 characters for English.
+        </p>
       </div>
 
-      <div className="row g-3 align-items-center">
-        <div className="col-lg-8">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.25rem", alignItems: "start" }}>
+        <div>
           <textarea
-            className="form-control"
+            className="form-textarea"
             rows={3}
             placeholder="Type or paste Amharic / English text here..."
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
-
-          {/* Character progress bar */}
-          <div className="progress mt-2" style={{ height: 6 }}>
+          <div style={{ height: "6px", background: "var(--bg-muted)", borderRadius: "9999px", overflow: "hidden", marginTop: "8px" }}>
             <div
-              className={`progress-bar ${pct > 85 ? "bg-warning" : "bg-success"}`}
-              role="progressbar"
-              style={{ width: `${pct}%` }}
-            ></div>
+              style={{
+                width: `${pct}%`,
+                height: "100%",
+                backgroundColor: pct > 85 ? "var(--status-warning-accent)" : "var(--status-success-accent)",
+                transition: "width 0.2s ease",
+              }}
+            />
           </div>
         </div>
 
-        <div className="col-lg-4">
-          <div className="p-3 rounded border bg-light">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <span className="text-secondary small">Encoding Format:</span>
-              <span className="badge bg-dark fw-semibold">
-                {calc.encoding} {calc.isUnicode ? "(Ge'ez)" : "(GSM-7)"}
-              </span>
-            </div>
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <span className="text-secondary small">Length:</span>
-              <span className="fw-bold text-slate-900">{calc.charCount} characters</span>
-            </div>
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <span className="text-secondary small">Billable Segments:</span>
-              <span className="badge bg-success-subtle text-success border border-success-subtle fs-6 px-2 py-1">
-                {calc.segmentCount} Segment{calc.segmentCount > 1 ? "s" : ""}
-              </span>
-            </div>
-            <div className="d-flex justify-content-between align-items-center">
-              <span className="text-secondary small">Remaining in Segment:</span>
-              <span className="fw-semibold text-secondary">
-                {calc.charsRemainingInSegment} chars
-              </span>
-            </div>
+        <div style={{ background: "var(--bg-subtle)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: "1rem", display: "flex", flexDirection: "column", gap: "0.625rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.8125rem" }}>
+            <span style={{ color: "var(--text-secondary)" }}>Encoding format</span>
+            <span className={`badge ${calc.isUnicode ? "badge-warning" : "badge-info"}`}>
+              {calc.encoding} {calc.isUnicode ? "(Ge'ez)" : "(GSM-7)"}
+            </span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.8125rem" }}>
+            <span style={{ color: "var(--text-secondary)" }}>Length</span>
+            <strong className="tabular-nums" style={{ color: "var(--text-primary)" }}>{calc.charCount} characters</strong>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.8125rem" }}>
+            <span style={{ color: "var(--text-secondary)" }}>Billable segments</span>
+            <span className="badge badge-success tabular-nums">
+              {calc.segmentCount} {calc.segmentCount === 1 ? "segment" : "segments"}
+            </span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.8125rem" }}>
+            <span style={{ color: "var(--text-secondary)" }}>Remaining in segment</span>
+            <span className="tabular-nums" style={{ fontWeight: 600, color: "var(--text-secondary)" }}>
+              {calc.charsRemainingInSegment} chars
+            </span>
           </div>
         </div>
       </div>

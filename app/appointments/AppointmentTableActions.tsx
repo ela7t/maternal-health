@@ -63,79 +63,106 @@ export function AppointmentTableActions({
   };
 
   if (!["scheduled", "missed"].includes(status)) {
-    return <span className="text-muted small">Completed</span>;
+    return (
+      <span style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>
+        Completed
+      </span>
+    );
   }
 
   return (
-    <div className="d-inline-flex gap-2">
+    <div style={{ display: "inline-flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end" }}>
       <button
         type="button"
         onClick={handleAttend}
         disabled={submitting}
-        className="btn btn-sm btn-outline-success fw-semibold"
+        className="btn btn-primary"
+        style={{ minHeight: "44px", padding: "0 14px" }}
       >
-        <i className="bi bi-check-lg"></i> Attended
+        <svg className="icon-svg sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+        <span>Attended</span>
       </button>
       <button
         type="button"
         onClick={() => setShowReschedule(true)}
         disabled={submitting}
-        className="btn btn-sm btn-outline-secondary fw-semibold"
+        className="btn btn-outline"
+        style={{ minHeight: "44px", padding: "0 14px" }}
       >
-        <i className="bi bi-calendar-plus"></i> Reschedule
+        <span>Reschedule</span>
       </button>
 
       {showReschedule && (
         <div
-          className="modal fade show d-block"
-          tabIndex={-1}
-          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          className="modal-backdrop"
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.65)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 200,
+            padding: "1rem",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowReschedule(false);
+          }}
         >
-          <div className="modal-dialog">
-            <div className="modal-content border-0 shadow text-start">
-              <form onSubmit={handleReschedule}>
-                <div className="modal-header border-bottom">
-                  <h5 className="modal-title fw-bold">Reschedule Appointment</h5>
-                  <button
-                    type="button"
-                    className="btn-close"
-                    onClick={() => setShowReschedule(false)}
-                  ></button>
+          <div className="card modal-content" style={{ maxWidth: "460px", width: "100%", padding: "24px", textAlign: "left" }}>
+            <form onSubmit={handleReschedule}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                <h3 style={{ margin: 0, fontSize: "1.125rem", fontWeight: 700, color: "var(--text-primary)" }}>
+                  Reschedule appointment
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowReschedule(false)}
+                  className="btn btn-outline"
+                  style={{ minHeight: "44px", minWidth: "44px", padding: 0 }}
+                  aria-label="Close modal"
+                >
+                  &times;
+                </button>
+              </div>
+              <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginBottom: "14px" }}>
+                Mother: <strong style={{ color: "var(--text-primary)" }}>{participantName}</strong> ({publicCode})
+              </p>
+              <div className="form-group">
+                <label className="form-label">New appointment date &amp; time</label>
+                <input
+                  type="datetime-local"
+                  className="form-input"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  required
+                />
+                <div className="form-hint">
+                  A new 72-hour reminder will be automatically queued for this date.
                 </div>
-                <div className="modal-body p-4">
-                  <p className="small text-muted mb-3">
-                    Mother: <strong>{participantName}</strong> ({publicCode})
-                  </p>
-                  <div className="mb-2">
-                    <label className="form-label small fw-semibold text-secondary">
-                      New Appointment Date & Time
-                    </label>
-                    <input
-                      type="datetime-local"
-                      className="form-control"
-                      value={newDate}
-                      onChange={(e) => setNewDate(e.target.value)}
-                      required
-                    />
-                    <small className="text-muted">
-                      A new 72-hour reminder will be automatically queued for this date.
-                    </small>
-                  </div>
-                </div>
-                <div className="modal-footer border-top bg-light">
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary"
-                    onClick={() => setShowReschedule(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button type="submit" disabled={submitting} className="btn btn-primary fw-bold">
-                    {submitting ? "Rescheduling..." : "Confirm Reschedule"}
-                  </button>
-                </div>
-              </form>
-            </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "18px" }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{ minHeight: "44px" }}
+                  onClick={() => setShowReschedule(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="btn btn-primary"
+                  style={{ minHeight: "44px" }}
+                >
+                  {submitting ? "Rescheduling..." : "Confirm reschedule"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
