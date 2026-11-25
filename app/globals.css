@@ -3393,3 +3393,102 @@ svg.icon-svg.xs {
     font-variant-numeric: tabular-nums;
     font-weight: 600;
 }
+
+/* Reports Page Styles (from Django reports_index.html) */
+.dropdown-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.55rem 0.85rem;
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 0.8125rem;
+    transition: background-color 0.1s ease;
+}
+.dropdown-link:hover {
+    background-color: var(--bg-subtle);
+}
+.cascade-stepper {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+.cascade-step-card {
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 0.85rem;
+    text-align: center;
+}
+.cascade-step-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 0.25rem;
+}
+.cascade-step-val {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+}
+.cascade-step-sub {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    margin-top: 0.2rem;
+}
+.inline-progress-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 120px;
+}
+.inline-progress-track {
+    flex: 1;
+    height: 6px;
+    background: var(--bg-muted);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+}
+.inline-progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--primary);
+}
+.inline-progress-target {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #f59e0b;
+    z-index: 2;
+}
+.chart-container-box {
+    position: relative;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 1rem 1.25rem;
+    margin-top: 1.25rem;
+}
+.chart-container-box-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+.chart-box-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}

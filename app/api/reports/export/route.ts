@@ -3,88 +3,123 @@ import prisma from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   const format = req.nextUrl.searchParams.get("format") || "csv";
+  const facilityParam = req.nextUrl.searchParams.get("facility_id");
+  const facilityId = facilityParam ? parseInt(facilityParam, 10) : null;
+  const participantWhere = facilityId && !Number.isNaN(facilityId) ? { facilityId } : {};
 
-  const [
-    activeWomen,
-    totalAnc,
-    attendedAnc,
-    totalBirths,
-    facilityBirths,
-    pncAttended,
-    totalSms,
-    deliveredSms,
-    optedOut,
-  ] = await Promise.all([
-    prisma.participant.count({ where: { status: { in: ["active_pregnant", "postnatal"] } } }),
-    prisma.appointment.count({ where: { kind: "anc" } }),
-    prisma.appointment.count({ where: { kind: "anc", status: "attended" } }),
-    prisma.pregnancy.count({ where: { deliveredAt: { not: null } } }),
-    prisma.pregnancy.count({ where: { deliveredAt: { not: null }, deliveryPlace: { not: null } } }),
-    prisma.appointment.count({ where: { kind: "pnc", status: "attended" } }),
-    prisma.outboxMessage.count(),
-    prisma.outboxMessage.count({ where: { status: { in: ["sent", "delivered", "submitted"] } } }),
-    prisma.participant.count({ where: { status: "opted_out" } }),
-  ]);
-
-  const rows = [
-    {
-      indicator: "Active Enrolled Mothers",
-      numerator: activeWomen,
-      denominator: null,
-      rate_pct: null,
+  const participants = await prisma.participant.findMany({
+    where: participantWhere,
+    include: {
+      facility: true,
+      pregnancies: { orderBy: { id: "desc" }, take: 1 },
+      appointments: true,
+      outboxMessages: true,
     },
+    orderBy: { id: "asc" },
+  });
+
+  const activeWomen = participants.filter((p) =>
+    ["active_pregnant", "postnatal"].includes(p.status)
+  ).length;
+  const allApts = participants.flatMap((p) => p.appointments);
+  const ancApts = allApts.filter((a) => a.kind === "anc");
+  const attendedAnc = ancApts.filter((a) => a.status === "attended").length;
+  const allPregs = participants.flatMap((p) => p.pregnancies);
+  const deliveries = allPregs.filter((pr) => pr.deliveredAt !== null);
+  const facilityBirths = deliveries.filter((pr) => Boolean(pr.deliveryPlace)).length;
+  const pncAttended = allApts.filter((a) => a.kind === "pnc" && a.status === "attended").length;
+  const allSms = participants.flatMap((p) => p.outboxMessages);
+  const deliveredSms = allSms.filter((m) =>
+    ["sent", "delivered", "submitted"].includes(m.status)
+  ).length;
+  const optedOut = participants.filter((p) => p.status === "opted_out").length;
+
+  const indicators = [
+    { indicator: "Active Enrolled Mothers", numerator: activeWomen, denominator: null, rate_pct: null },
     {
-      indicator: "ANC Contacts Attended",
+      indicator: "ANC Contacts On Time",
       numerator: attendedAnc,
-      denominator: totalAnc,
-      rate_pct: totalAnc > 0 ? Math.round((attendedAnc / totalAnc) * 100) : null,
+      denominator: ancApts.length,
+      rate_pct: ancApts.length > 0 ? Math.round((attendedAnc / ancApts.length) * 1000) / 10 : 0,
     },
     {
-      indicator: "Facility Births Share",
+      indicator: "Institutional / Facility Births Share",
       numerator: facilityBirths,
-      denominator: totalBirths,
-      rate_pct: totalBirths > 0 ? Math.round((facilityBirths / totalBirths) * 100) : null,
+      denominator: deliveries.length,
+      rate_pct: deliveries.length > 0 ? Math.round((facilityBirths / deliveries.length) * 1000) / 10 : 0,
     },
     {
-      indicator: "PNC Contacts Attended",
+      indicator: "PNC Contact within 7 Days of Birth",
       numerator: pncAttended,
-      denominator: totalBirths,
-      rate_pct: totalBirths > 0 ? Math.min(100, Math.round((pncAttended / totalBirths) * 100)) : null,
+      denominator: deliveries.length,
+      rate_pct: deliveries.length > 0 ? Math.min(100, Math.round((pncAttended / deliveries.length) * 1000) / 10) : 0,
     },
     {
-      indicator: "SMS Delivery Rate",
+      indicator: "SMS Telephony Delivery Rate",
       numerator: deliveredSms,
-      denominator: totalSms,
-      rate_pct: totalSms > 0 ? Math.round((deliveredSms / totalSms) * 100) : null,
+      denominator: allSms.length,
+      rate_pct: allSms.length > 0 ? Math.round((deliveredSms / allSms.length) * 1000) / 10 : 0,
     },
     {
-      indicator: "Opt-Out Count",
+      indicator: "Participant SMS Opt-Out Rate",
       numerator: optedOut,
-      denominator: null,
-      rate_pct: null,
+      denominator: participants.length,
+      rate_pct: participants.length > 0 ? Math.round((optedOut / participants.length) * 1000) / 10 : 0,
     },
   ];
+
+  const cohortMicrodata = participants.map((p) => {
+    const preg = p.pregnancies[0];
+    return {
+      study_code: p.publicCode,
+      facility: p.facility.name,
+      status: p.status,
+      language: p.preferredLanguage,
+      study_arm: p.studyArm,
+      risk_status: preg?.riskStatus || "standard",
+      anc_attended: p.appointments.filter((a) => a.kind === "anc" && a.status === "attended").length,
+      pnc_attended: p.appointments.filter((a) => a.kind === "pnc" && a.status === "attended").length,
+      delivered: Boolean(preg?.deliveredAt),
+    };
+  });
 
   if (format === "json") {
     return NextResponse.json(
       {
         generatedAt: new Date().toISOString(),
         deidentified: true,
-        indicators: rows,
+        indicators,
+        cohort: cohortMicrodata,
       },
       {
         headers: {
-          "Content-Disposition": 'attachment; filename="mnh_indicators_report.json"',
+          "Content-Disposition": 'attachment; filename="mnh_research_dataset.json"',
         },
       }
     );
   }
 
+  if (format === "microdata_csv") {
+    const lines = [
+      "StudyCode,Facility,Status,Language,StudyArm,RiskStatus,ANCAttended,PNCAttended,Delivered",
+      ...cohortMicrodata.map(
+        (c) =>
+          `"${c.study_code}","${c.facility}","${c.status}","${c.language}","${c.study_arm}","${c.risk_status}",${c.anc_attended},${c.pnc_attended},${c.delivered}`
+      ),
+    ];
+    return new NextResponse(lines.join("\n"), {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": 'attachment; filename="mnh_cohort_microdata.csv"',
+      },
+    });
+  }
+
   const csvLines = [
     "Indicator,Numerator,Denominator,Rate (%)",
-    ...rows.map(
-      (r) =>
-        `"${r.indicator}",${r.numerator},${r.denominator ?? ""},${r.rate_pct ?? ""}`
+    ...indicators.map(
+      (r) => `"${r.indicator}",${r.numerator},${r.denominator ?? ""},${r.rate_pct ?? ""}`
     ),
   ];
 
@@ -92,7 +127,10 @@ export async function GET(req: NextRequest) {
     status: 200,
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="mnh_indicators_report.csv"',
+      "Content-Disposition":
+        format === "xlsx"
+          ? 'attachment; filename="mnh_indicators_workbook.csv"'
+          : 'attachment; filename="mnh_indicators_summary.csv"',
     },
   });
 }

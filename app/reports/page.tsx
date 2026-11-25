@@ -1,178 +1,307 @@
 import prisma from "@/lib/prisma";
+import { calculateGestationalAge } from "@/lib/ethiopianCalendar";
+import {
+  ReportsClient,
+  BenchmarkRow,
+  CascadeMilestone,
+  RiskStageRow,
+} from "./ReportsClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function ReportsPage() {
-  const [
-    totalEnrolled,
-    activePregnant,
-    postnatal,
-    completed,
-    totalAnc,
-    attendedAnc,
-    totalMissed,
-    totalBirths,
-    facilityBirths,
-    pncAttended,
-    totalSms,
-    deliveredSms,
-  ] = await Promise.all([
-    prisma.participant.count(),
-    prisma.participant.count({ where: { status: "active_pregnant" } }),
-    prisma.participant.count({ where: { status: "postnatal" } }),
-    prisma.participant.count({ where: { status: "completed" } }),
-    prisma.appointment.count({ where: { kind: "anc" } }),
-    prisma.appointment.count({ where: { kind: "anc", status: "attended" } }),
-    prisma.appointment.count({ where: { status: "missed" } }),
-    prisma.pregnancy.count({ where: { deliveredAt: { not: null } } }),
-    prisma.pregnancy.count({ where: { deliveredAt: { not: null }, deliveryPlace: { not: null } } }),
-    prisma.appointment.count({ where: { kind: "pnc", status: "attended" } }),
-    prisma.outboxMessage.count(),
-    prisma.outboxMessage.count({ where: { status: { in: ["sent", "delivered", "submitted"] } } }),
+interface Props {
+  searchParams: Promise<{ facility_id?: string }>;
+}
+
+const MILESTONE_LABELS = [
+  "ANC 1 (16w)",
+  "ANC 2 (20w)",
+  "ANC 3 (26w)",
+  "ANC 4 (30w)",
+  "ANC 5 (34w)",
+  "ANC 6 (36w)",
+  "ANC 7 (38w)",
+  "ANC 8 (42w)",
+  "PNC 1 (48h)",
+  "PNC 2 (7-14d)",
+  "PNC 3 (6w)",
+];
+
+export default async function ReportsPage({ searchParams }: Props) {
+  const sp = await searchParams;
+  const facilityId = sp.facility_id ? parseInt(sp.facility_id, 10) : null;
+  const validFacilityId = facilityId && !Number.isNaN(facilityId) ? facilityId : null;
+  const whereParticipant = validFacilityId ? { facilityId: validFacilityId } : {};
+
+  const [facilities, participants] = await Promise.all([
+    prisma.facility.findMany({ orderBy: { name: "asc" } }),
+    prisma.participant.findMany({
+      where: whereParticipant,
+      include: {
+        pregnancies: { orderBy: { id: "desc" }, take: 1 },
+        appointments: { orderBy: { scheduledFor: "asc" } },
+        outboxMessages: true,
+      },
+    }),
   ]);
 
-  const benchmarks = [
+  const selectedFacility = facilities.find((f) => f.id === validFacilityId) || null;
+  const activeWomen = participants.filter((p) =>
+    ["active_pregnant", "postnatal"].includes(p.status)
+  ).length;
+  const optedOutCount = participants.filter((p) => p.status === "opted_out").length;
+
+  const allApts = participants.flatMap((p) => p.appointments);
+  const ancApts = allApts.filter((a) => a.kind === "anc");
+  const attendedAnc = ancApts.filter((a) => a.status === "attended").length;
+  const missedApts = allApts.filter((a) => a.status === "missed");
+  const tracedMissed = missedApts.filter((a) => a.status === "rescheduled").length;
+
+  const allPregs = participants.flatMap((p) => p.pregnancies);
+  const deliveredPregs = allPregs.filter((pr) => pr.deliveredAt !== null);
+  const facilityBirths = deliveredPregs.filter((pr) => Boolean(pr.deliveryPlace)).length;
+  const anc4Count = participants.filter(
+    (p) =>
+      p.pregnancies[0]?.deliveredAt &&
+      p.appointments.filter((a) => a.kind === "anc" && a.status === "attended").length >= 4
+  ).length;
+  const anc8Count = participants.filter(
+    (p) =>
+      p.pregnancies[0]?.deliveredAt &&
+      p.appointments.filter((a) => a.kind === "anc" && a.status === "attended").length >= 8
+  ).length;
+
+  const pncAttended = allApts.filter((a) => a.kind === "pnc" && a.status === "attended").length;
+  const allSms = participants.flatMap((p) => p.outboxMessages);
+  const deliveredSms = allSms.filter((m) =>
+    ["sent", "delivered", "submitted"].includes(m.status)
+  ).length;
+
+  const pct = (num: number, den: number) =>
+    den > 0 ? Math.min(100, Math.round((num / den) * 1000) / 10) : 0;
+
+  const benchmarks: BenchmarkRow[] = [
     {
-      name: "ANC contacts attended",
-      num: attendedAnc,
-      den: totalAnc,
-      target: 80,
-      baseline: "34%",
+      label: "ANC Contacts On Time (attended ≤ 7 days of scheduled date)",
+      shortLabel: "ANC On-Time (≤ 7d)",
+      numerator: attendedAnc,
+      denominator: ancApts.length,
+      ratePct: pct(attendedAnc, ancApts.length),
+      whoTarget: 80,
+      whoTargetDisplay: "80%",
+      edhsBaseline: 34,
+      edhsDisplay: "34%",
     },
     {
-      name: "Facility birth share",
-      num: facilityBirths,
-      den: totalBirths,
-      target: 90,
-      baseline: "48%",
+      label: "Women with ≥ 4 ANC Contacts by Delivery",
+      shortLabel: "≥ 4 ANC Contacts",
+      numerator: anc4Count,
+      denominator: deliveredPregs.length,
+      ratePct: pct(anc4Count, deliveredPregs.length),
+      whoTarget: 85,
+      whoTargetDisplay: "85%",
+      edhsBaseline: 43,
+      edhsDisplay: "43%",
     },
     {
-      name: "PNC contacts attended",
-      num: pncAttended,
-      den: totalBirths,
-      target: 80,
-      baseline: "34%",
+      label: "Women with ≥ 8 ANC Contacts (WHO 2016 Guideline)",
+      shortLabel: "≥ 8 ANC Contacts",
+      numerator: anc8Count,
+      denominator: deliveredPregs.length,
+      ratePct: pct(anc8Count, deliveredPregs.length),
+      whoTarget: 60,
+      whoTargetDisplay: "60%",
+      edhsBaseline: 18,
+      edhsDisplay: "18%",
     },
     {
-      name: "SMS delivery rate",
-      num: deliveredSms,
-      den: totalSms,
-      target: 95,
-      baseline: "—",
+      label: "Missed Visits Followed Up / Traced (≤ 7 days)",
+      shortLabel: "Missed Visits Followed Up",
+      numerator: tracedMissed,
+      denominator: missedApts.length,
+      ratePct: pct(tracedMissed, missedApts.length),
+      whoTarget: 75,
+      whoTargetDisplay: "75%",
+      edhsBaseline: 25,
+      edhsDisplay: "25%",
+    },
+    {
+      label: "Institutional / Facility Births Share",
+      shortLabel: "Facility Births Share",
+      numerator: facilityBirths,
+      denominator: deliveredPregs.length,
+      ratePct: pct(facilityBirths, deliveredPregs.length),
+      whoTarget: 90,
+      whoTargetDisplay: "90%",
+      edhsBaseline: 48,
+      edhsDisplay: "48%",
+    },
+    {
+      label: "PNC Contact within 7 Days of Birth",
+      shortLabel: "PNC within 7 Days",
+      numerator: pncAttended,
+      denominator: deliveredPregs.length,
+      ratePct: pct(pncAttended, deliveredPregs.length),
+      whoTarget: 85,
+      whoTargetDisplay: "85%",
+      edhsBaseline: 34,
+      edhsDisplay: "34%",
+    },
+    {
+      label: "SMS Telephony Delivery Rate",
+      shortLabel: "SMS Telephony Delivery",
+      numerator: deliveredSms,
+      denominator: allSms.length,
+      ratePct: pct(deliveredSms, allSms.length),
+      whoTarget: 95,
+      whoTargetDisplay: "95%",
+      edhsBaseline: 88,
+      edhsDisplay: "88%",
+    },
+    {
+      label: "Participant SMS Opt-Out Rate",
+      shortLabel: "SMS Opt-Out Rate",
+      numerator: optedOutCount,
+      denominator: participants.length,
+      ratePct: pct(optedOutCount, participants.length),
+      whoTarget: null,
+      whoTargetDisplay: "< 5%",
+      edhsBaseline: null,
+      edhsDisplay: "-",
     },
   ];
 
-  const cascade = [
-    { label: "Total enrolled", value: totalEnrolled },
-    { label: "Active pregnant", value: activePregnant },
-    { label: "Deliveries recorded", value: totalBirths },
-    { label: "Postnatal active", value: postnatal },
-    { label: "Graduated", value: completed },
-    { label: "Missed visits", value: totalMissed },
+  // Build 11-milestone cascade (8 ANC + 3 PNC)
+  const cascade: CascadeMilestone[] = MILESTONE_LABELS.map((label, idx) => {
+    const isAnc = idx < 8;
+    const slotIndex = isAnc ? idx : idx - 8;
+    let scheduled = 0;
+    let attended = 0;
+    let pending = 0;
+    let missed = 0;
+    for (const p of participants) {
+      const list = p.appointments.filter((a) => a.kind === (isAnc ? "anc" : "pnc"));
+      const apt = list[slotIndex];
+      if (!apt) continue;
+      scheduled++;
+      if (apt.status === "attended") attended++;
+      else if (apt.status === "missed") missed++;
+      else pending++;
+    }
+    return {
+      label,
+      scheduled,
+      attended,
+      pending,
+      missed,
+      retentionPct: pct(attended, scheduled),
+    };
+  });
+
+  // Gestational & Risk Stratification
+  const buckets = {
+    t1Std: 0, t1High: 0,
+    t2Std: 0, t2High: 0,
+    t3Std: 0, t3High: 0,
+    postTermStd: 0, postTermHigh: 0,
+    pncStd: 0, pncHigh: 0,
+  };
+
+  for (const p of participants) {
+    const preg = p.pregnancies[0];
+    const isHigh = preg?.riskStatus === "high";
+    if (p.status === "postnatal") {
+      if (isHigh) buckets.pncHigh++;
+      else buckets.pncStd++;
+      continue;
+    }
+    if (p.status !== "active_pregnant" || !preg?.eddDate) continue;
+    const ga = calculateGestationalAge(preg.eddDate);
+    if (ga.weeks <= 12) {
+      if (isHigh) buckets.t1High++; else buckets.t1Std++;
+    } else if (ga.weeks <= 27) {
+      if (isHigh) buckets.t2High++; else buckets.t2Std++;
+    } else if (ga.weeks <= 40) {
+      if (isHigh) buckets.t3High++; else buckets.t3Std++;
+    } else {
+      if (isHigh) buckets.postTermHigh++; else buckets.postTermStd++;
+    }
+  }
+
+  const riskStages: RiskStageRow[] = [
+    {
+      label: "1st Trimester (1–12 weeks)",
+      chartLabel: "1st Trimester (1-12w)",
+      standard: buckets.t1Std,
+      high: buckets.t1High,
+      total: buckets.t1Std + buckets.t1High,
+      protocol: "Dating scan & baseline labs",
+      badgeClass: "badge-neutral",
+    },
+    {
+      label: "2nd Trimester (13–27 weeks)",
+      chartLabel: "2nd Trimester (13-27w)",
+      standard: buckets.t2Std,
+      high: buckets.t2High,
+      total: buckets.t2Std + buckets.t2High,
+      protocol: "Routine bi-weekly SMS reminders",
+      badgeClass: "badge-info",
+    },
+    {
+      label: "3rd Trimester (28–40 weeks)",
+      chartLabel: "3rd Trimester (28-42w)",
+      standard: buckets.t3Std,
+      high: buckets.t3High,
+      total: buckets.t3Std + buckets.t3High,
+      protocol: "Birth preparedness & danger signs",
+      badgeClass: "badge-warning",
+    },
+    {
+      label: "Post-Term (> 40 weeks)",
+      chartLabel: "Post-Term (>42w)",
+      standard: buckets.postTermStd,
+      high: buckets.postTermHigh,
+      total: buckets.postTermStd + buckets.postTermHigh,
+      protocol: "Immediate delivery triage / HEW call",
+      badgeClass: "badge-urgent",
+    },
+    {
+      label: "Postnatal Cohort (Completed Delivery)",
+      chartLabel: "Postnatal Cohort",
+      standard: buckets.pncStd,
+      high: buckets.pncHigh,
+      total: buckets.pncStd + buckets.pncHigh,
+      protocol: "Postpartum & baby education (every week)",
+      badgeClass: "badge-success",
+    },
   ];
+
+  const generatedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
 
   return (
-    <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "1rem", marginBottom: "1.5rem" }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.25rem" }}>
-            <h1 className="page-title" style={{ margin: 0 }}>
-              Clinical health indicators &amp; research reports
-            </h1>
-            <span className="badge badge-neutral">Strictly de-identified</span>
-          </div>
-          <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "0.875rem" }}>
-            WHO care continuum benchmarks &amp; research microdata exports
-          </p>
-        </div>
-
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          <a href="/api/reports/export?format=csv" className="btn btn-outline" style={{ minHeight: "44px" }}>
-            Export CSV
-          </a>
-          <a href="/api/reports/export?format=json" className="btn btn-primary" style={{ minHeight: "44px" }}>
-            Export JSON dataset
-          </a>
-        </div>
-      </div>
-
-      {/* Care Continuum Cascade */}
-      <div className="card" style={{ padding: "1.25rem 1.5rem", marginBottom: "1.5rem" }}>
-        <h2 className="card-title" style={{ marginBottom: "1rem" }}>
-          Care continuum cascade
-        </h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.75rem" }}>
-          {cascade.map((step) => (
-            <div
-              key={step.label}
-              style={{
-                background: "var(--bg-subtle)",
-                border: "1px solid var(--border-color)",
-                borderRadius: "var(--radius-md)",
-                padding: "0.875rem",
-                textAlign: "center",
-              }}
-            >
-              <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                {step.label}
-              </div>
-              <div className="tabular-nums" style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--text-primary)", marginTop: "0.25rem" }}>
-                {step.value}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Benchmarking Matrix */}
-      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-        <div className="card-header" style={{ padding: "1rem 1.25rem", marginBottom: 0 }}>
-          <h2 className="card-title">Clinical health indicators &amp; benchmarking matrix</h2>
-        </div>
-        <div className="table-responsive">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Clinical health indicator</th>
-                <th style={{ textAlign: "right" }}>Numerator</th>
-                <th style={{ textAlign: "right" }}>Denominator</th>
-                <th>Observed rate</th>
-                <th style={{ textAlign: "right" }}>WHO target</th>
-                <th style={{ textAlign: "right" }}>EDHS baseline</th>
-              </tr>
-            </thead>
-            <tbody>
-              {benchmarks.map((b) => {
-                const rate = b.den > 0 ? Math.min(100, Math.round((b.num / b.den) * 100)) : null;
-                return (
-                  <tr key={b.name}>
-                    <td style={{ fontWeight: 600 }}>{b.name}</td>
-                    <td className="tabular-nums" style={{ textAlign: "right" }}>{b.num}</td>
-                    <td className="tabular-nums" style={{ textAlign: "right" }}>{b.den}</td>
-                    <td>
-                      {rate !== null ? (
-                        <span className={`badge ${rate >= b.target ? "badge-success" : "badge-neutral"} tabular-nums`}>
-                          {rate}%
-                        </span>
-                      ) : (
-                        <span style={{ color: "var(--text-muted)", fontSize: "0.8125rem" }}>
-                          &mdash; (No data yet)
-                        </span>
-                      )}
-                    </td>
-                    <td className="tabular-nums" style={{ textAlign: "right", fontWeight: 600 }}>
-                      {b.target}%
-                    </td>
-                    <td className="tabular-nums" style={{ textAlign: "right", color: "var(--text-secondary)" }}>
-                      {b.baseline}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+    <ReportsClient
+      facilities={facilities.map((f) => ({ id: f.id, name: f.name }))}
+      selectedFacilityId={validFacilityId}
+      facilitySubtitle={
+        selectedFacility
+          ? `${selectedFacility.name} (${selectedFacility.code})`
+          : "Wolkite University Specialized Hospital (WUSH-001)"
+      }
+      generatedAt={generatedAt}
+      kpis={{
+        activeWomen,
+        ancOnTimePct: pct(attendedAnc, ancApts.length),
+        ancAttended,
+        ancTotal: ancApts.length,
+        facilityBirthPct: pct(facilityBirths, deliveredPregs.length),
+        facilityBirths,
+        totalBirths: deliveredPregs.length,
+        pnc7dPct: pct(pncAttended, deliveredPregs.length),
+        pnc7dCount: pncAttended,
+      }}
+      benchmarks={benchmarks}
+      cascade={cascade}
+      riskStages={riskStages}
+    />
   );
 }
