@@ -64,15 +64,18 @@ function GestationalTracker({
               <div className="gt-bar-fill" style={{ width: `clamp(4%, ${pct}%, 100%)` }} />
               {ANC_WEEKS.map((wk, idx) => {
                 const tickPct = ((wk - 12) / 30) * 100;
-                const status = ancStatuses[idx] || "upcoming";
-                const isAttended = status === "attended";
-                const isMissed = status === "missed";
+                const explicitStatus = ancStatuses[idx];
+                const hasMissed = ancStatuses.includes("missed");
+                const isMissed = explicitStatus === "missed";
+                const isAttended =
+                  explicitStatus === "attended" ||
+                  (!explicitStatus && !hasMissed && wk <= gaWeeks);
                 return (
                   <div
                     key={wk}
                     className={`gt-node-marker ${isAttended ? "attended" : isMissed ? "missed" : "upcoming"}`}
                     style={{ left: `${tickPct}%` }}
-                    title={`ANC ${idx + 1}: ${wk}w (${status})`}
+                    title={`ANC ${idx + 1}: ${wk}w`}
                   >
                     {isAttended ? (
                       <svg
