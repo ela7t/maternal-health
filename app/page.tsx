@@ -29,9 +29,11 @@ function getAgeYears(dob: Date | null | undefined, now: Date): number | null {
 function GestationalTracker({
   eddDate,
   calloutLabel,
+  ancStatuses = [],
 }: {
   eddDate: Date | null | undefined;
   calloutLabel: string;
+  ancStatuses?: string[];
 }) {
   if (!eddDate) return null;
   const gaInfo = calculateGestationalAge(eddDate);
@@ -62,15 +64,17 @@ function GestationalTracker({
               <div className="gt-bar-fill" style={{ width: `clamp(4%, ${pct}%, 100%)` }} />
               {ANC_WEEKS.map((wk, idx) => {
                 const tickPct = ((wk - 12) / 30) * 100;
-                const isPast = wk <= gaWeeks;
+                const status = ancStatuses[idx] || "upcoming";
+                const isAttended = status === "attended";
+                const isMissed = status === "missed";
                 return (
                   <div
                     key={wk}
-                    className={`gt-node-marker ${isPast ? "attended" : "upcoming"}`}
+                    className={`gt-node-marker ${isAttended ? "attended" : isMissed ? "missed" : "upcoming"}`}
                     style={{ left: `${tickPct}%` }}
-                    title={`ANC ${idx + 1}: ${wk}w`}
+                    title={`ANC ${idx + 1}: ${wk}w (${status})`}
                   >
-                    {isPast ? (
+                    {isAttended ? (
                       <svg
                         className="gt-node-icon"
                         width="11"
@@ -82,6 +86,8 @@ function GestationalTracker({
                       >
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
+                    ) : isMissed ? (
+                      <span className="gt-node-cross">&times;</span>
                     ) : (
                       <span className="gt-node-idx">{idx + 1}</span>
                     )}
@@ -141,6 +147,7 @@ export default async function TodayPage() {
           include: {
             facility: true,
             phones: { where: { isPrimary: true } },
+            appointments: { where: { kind: "anc" }, orderBy: { scheduledFor: "asc" } },
             outboxMessages: {
               where: { status: { in: ["sent", "delivered", "submitted"] } },
               orderBy: { sentAt: "desc" },
@@ -165,6 +172,7 @@ export default async function TodayPage() {
             facility: true,
             phones: { where: { isPrimary: true } },
             pregnancies: { orderBy: { id: "desc" }, take: 1 },
+            appointments: { where: { kind: "anc" }, orderBy: { scheduledFor: "asc" } },
             outboxMessages: {
               where: { status: { in: ["sent", "delivered", "submitted"] } },
               orderBy: { sentAt: "desc" },
@@ -187,6 +195,7 @@ export default async function TodayPage() {
             facility: true,
             phones: { where: { isPrimary: true } },
             pregnancies: { orderBy: { id: "desc" }, take: 1 },
+            appointments: { where: { kind: "anc" }, orderBy: { scheduledFor: "asc" } },
             outboxMessages: {
               where: { status: { in: ["sent", "delivered", "submitted"] } },
               orderBy: { sentAt: "desc" },
@@ -406,7 +415,11 @@ export default async function TodayPage() {
                       )}
                     </div>
 
-                    <GestationalTracker eddDate={preg.eddDate} calloutLabel={`EDD: ${eddLabel}`} />
+                    <GestationalTracker
+                      eddDate={preg.eddDate}
+                      calloutLabel={`EDD: ${eddLabel}`}
+                      ancStatuses={preg.participant.appointments.map((a) => a.status)}
+                    />
 
                     <div className="priority-right">
                       <Link href={`/participants/${preg.participant.id}`} className="btn btn-primary" style={{ minHeight: "44px" }}>
@@ -450,6 +463,11 @@ export default async function TodayPage() {
                 const lastSms = apt.participant.outboxMessages[0];
                 const daysAgo = Math.max(1, Math.floor((startOfToday.getTime() - apt.scheduledFor.getTime()) / (1000 * 3600 * 24)));
                 const dueShort = apt.scheduledFor.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                const contactIdx = apt.participant.appointments.findIndex((a) => a.id === apt.id);
+                const contactNum = contactIdx >= 0 ? contactIdx + 1 : 1;
+                const ancStatuses = apt.participant.appointments.map((a) =>
+                  a.id === apt.id ? "missed" : a.status
+                );
                 return (
                   <div key={apt.id} className="priority-row-card">
                     <div className="priority-left">
@@ -490,7 +508,8 @@ export default async function TodayPage() {
 
                     <GestationalTracker
                       eddDate={preg?.eddDate}
-                      calloutLabel={`Due: ${apt.kind.toUpperCase()} (${dueShort})`}
+                      calloutLabel={`Due: ${apt.kind.toUpperCase()} ${contactNum} (${dueShort})`}
+                      ancStatuses={ancStatuses}
                     />
 
                     <div className="priority-right">
@@ -534,6 +553,9 @@ export default async function TodayPage() {
               const lastSms = apt.participant.outboxMessages[0];
               const dobAge = getAgeYears(apt.participant.dateOfBirth, now);
               const dueShort = apt.scheduledFor.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+              const contactIdx = apt.participant.appointments.findIndex((a) => a.id === apt.id);
+              const contactNum = contactIdx >= 0 ? contactIdx + 1 : 1;
+              const ancStatuses = apt.participant.appointments.map((a) => a.status);
 
               return (
                 <div key={apt.id} className="priority-row-card">
@@ -591,7 +613,8 @@ export default async function TodayPage() {
                   {/* Center: Gestational Week 12-42 Tracker */}
                   <GestationalTracker
                     eddDate={preg?.eddDate}
-                    calloutLabel={`Due: ${apt.kind.toUpperCase()} (${dueShort})`}
+                    calloutLabel={`Due: ${apt.kind.toUpperCase()} ${contactNum} (${dueShort})`}
+                    ancStatuses={ancStatuses}
                   />
 
                   {/* Right: Record visit CTA */}

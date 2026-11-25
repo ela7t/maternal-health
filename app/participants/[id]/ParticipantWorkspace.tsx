@@ -734,7 +734,8 @@ export function ParticipantWorkspace({
 
                 {ga && (
                   <div style={{ marginTop: "0.75rem", fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
-                    &bull; <strong>Active Gestation:</strong> Trimester ({ga.formatted})
+                    &bull; <strong>Active Gestation:</strong>{" "}
+                    {ga.trimester === 1 ? "1st" : ga.trimester === 2 ? "2nd" : "3rd"} Trimester ({ga.formatted})
                     {ga.daysUntilEdd !== null && ga.daysUntilEdd > 0 ? `, ${ga.daysUntilEdd} days to delivery.` : "."}
                   </div>
                 )}
