@@ -112,6 +112,32 @@ export function RegisterMotherForm({
   const computedEddEth = computedEdd ? formatEthiopianDate(gregorianToEthiopian(computedEdd), "am") : "";
   const computedEddIso = computedEdd ? computedEdd.toISOString().slice(0, 10) : "";
 
+  // Live DOB age preview (works for both GC and EC)
+  let resolvedDobIso = "";
+  if (dobCalType === "gregorian" && dateOfBirth) {
+    resolvedDobIso = dateOfBirth;
+  } else if (dobCalType === "ethiopian" && dobEthYear && dobEthMonth && dobEthDay) {
+    try {
+      resolvedDobIso = ethiopianToGregorian(dobEthYear, dobEthMonth, dobEthDay).toISOString().slice(0, 10);
+    } catch {
+      resolvedDobIso = "";
+    }
+  }
+  const computedAgeYears = resolvedDobIso
+    ? Math.floor((Date.now() - new Date(resolvedDobIso).getTime()) / (1000 * 3600 * 24 * 365.25))
+    : null;
+
+  const ethLmpGregHint =
+    calendarType === "ethiopian" && ethYear && ethMonth && ethDay
+      ? (() => {
+          try {
+            return ethiopianToGregorian(ethYear, ethMonth, ethDay).toISOString().slice(0, 10);
+          } catch {
+            return "";
+          }
+        })()
+      : "";
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim()) {
@@ -145,7 +171,7 @@ export function RegisterMotherForm({
         body: JSON.stringify({
           studyCode: studyCode.trim() || undefined,
           fullName,
-          dateOfBirth: dateOfBirth || undefined,
+          dateOfBirth: resolvedDobIso || undefined,
           facilityId,
           kebele: kebele || "Kebele 01",
           address,
@@ -300,6 +326,11 @@ export function RegisterMotherForm({
                   </select>
                   <input type="number" className="form-input" min={1} max={30} value={dobEthDay} onChange={(e) => setDobEthDay(Number(e.target.value))} placeholder="Day" />
                 </div>
+              </div>
+            )}
+            {computedAgeYears !== null && computedAgeYears >= 10 && computedAgeYears <= 65 && (
+              <div style={{ marginTop: "0.4rem", fontSize: "0.8125rem", color: "#10b981", fontWeight: 500 }}>
+                ✓ {computedAgeYears} years old (GC: {resolvedDobIso})
               </div>
             )}
           </div>
@@ -573,7 +604,10 @@ export function RegisterMotherForm({
                   type="date"
                   className="form-input"
                   value={eddDate}
-                  onChange={(e) => setEddDate(e.target.value)}
+                  onChange={(e) => {
+                    setEddDate(e.target.value);
+                    setGregDate(addDaysIso(e.target.value, -280));
+                  }}
                 />
               </div>
             </div>
@@ -597,6 +631,11 @@ export function RegisterMotherForm({
                   <input type="number" className="form-input" min={1} max={30} value={ethDay} onChange={(e) => setEthDay(Number(e.target.value))} />
                 </div>
               </div>
+              {ethLmpGregHint && (
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.625rem" }}>
+                  Gregorian equivalent (LMP): <strong>{ethLmpGregHint}</strong>
+                </div>
+              )}
             </div>
           )}
 
