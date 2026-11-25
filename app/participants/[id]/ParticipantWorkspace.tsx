@@ -216,6 +216,12 @@ export function ParticipantWorkspace({
       .sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime())[0] ||
     null;
 
+  const isNextVisitOverdue = Boolean(
+    nextVisit &&
+      (nextVisit.status === "missed" ||
+        new Date(nextVisit.scheduledFor) < new Date(new Date().setHours(0, 0, 0, 0)))
+  );
+
   const nextAncSlotIdx = nextVisit?.kind === "anc" ? getAncSlotIdx(nextVisit.scheduledFor, pregnancy?.eddIso) : -1;
   const nextAncLabel =
     nextVisit?.kind === "anc"
@@ -517,10 +523,20 @@ export function ParticipantWorkspace({
           )}
           {nextVisit && (
             <div>
-              <span style={{ color: "var(--text-muted)", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", display: "block" }}>
-                Next Appointment
+              <span
+                style={{
+                  color: isNextVisitOverdue ? "var(--status-urgent-text)" : "var(--text-muted)",
+                  fontSize: "0.75rem",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  display: "block",
+                }}
+              >
+                {isNextVisitOverdue ? "Missed Appointment" : "Next Appointment"}
               </span>
-              <strong style={{ color: "var(--text-primary)" }}>{nextAncLabel}</strong>{" "}
+              <strong style={{ color: isNextVisitOverdue ? "var(--status-urgent-text)" : "var(--text-primary)" }}>
+                {nextAncLabel}
+              </strong>{" "}
               <span className="tabular-nums" style={{ color: "var(--text-secondary)" }}>
                 &bull; {new Date(nextVisit.scheduledFor).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
               </span>
@@ -706,11 +722,27 @@ export function ParticipantWorkspace({
                     );
                     const attended = matchedApt ? matchedApt.status === "attended" : delivered;
                     const isNext = !delivered && nextVisit && matchedApt?.id === nextVisit.id;
+                    const isMissedNode = Boolean(
+                      !attended &&
+                        matchedApt &&
+                        (matchedApt.status === "missed" ||
+                          (isNext && isNextVisitOverdue))
+                    );
                     return (
                       <div key={node.num} className="c-step-item">
-                        {isNext && <span className="c-step-next-badge">NEXT</span>}
-                        <div className={`c-step-node ${attended ? "is-attended" : isNext ? "is-next" : "is-upcoming"}`}>
-                          {attended ? "✓" : node.num}
+                        {isNext && (
+                          <span
+                            className="c-step-next-badge"
+                            style={isMissedNode ? { background: "#ef4444", color: "#ffffff" } : undefined}
+                          >
+                            {isMissedNode ? "MISSED" : "NEXT"}
+                          </span>
+                        )}
+                        <div
+                          className={`c-step-node ${attended ? "is-attended" : isNext ? "is-next" : "is-upcoming"}`}
+                          style={isMissedNode ? { borderColor: "#ef4444", color: "#ef4444" } : undefined}
+                        >
+                          {attended ? "✓" : isMissedNode ? "!" : node.num}
                         </div>
                         <span className="c-step-label tabular-nums">{node.week}w</span>
                         {matchedApt && (
