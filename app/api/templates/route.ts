@@ -56,3 +56,37 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const id = Number(body.id);
+    const action = String(body.action || "");
+    if (!id || Number.isNaN(id)) {
+      return NextResponse.json({ error: "Invalid template id" }, { status: 400 });
+    }
+
+    const statusMap: Record<string, string> = {
+      submit_review: "in_review",
+      approve: "approved",
+      retire: "retired",
+    };
+
+    const nextStatus = statusMap[action];
+    if (!nextStatus) {
+      return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    }
+
+    const updated = await prisma.messageTemplate.update({
+      where: { id },
+      data: { approvalStatus: nextStatus },
+    });
+
+    return NextResponse.json({ success: true, template: updated });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err.message || "Failed to update template status." },
+      { status: 500 }
+    );
+  }
+}
