@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
-import { processPregnancyLoss, planSchedules } from "@/lib/scheduler/dispatcher";
+import { processOptOut, processPregnancyLoss } from "@/lib/scheduler/dispatcher";
+import { recordDelivery, recordVisit, updatePrimaryPhone } from "@/lib/domain/clinicalActions";
+import { DomainError } from "@/lib/domain/stateMachines";
 import { calculateGestationalAge, calculatePostnatalAge } from "@/lib/clinical/gestational-age";
 import { gregorianToEthiopian, formatEthiopianDate } from "@/lib/calendar/ethiopian";
 import { sendSms } from "@/lib/sms/afromessage";
@@ -199,60 +200,7 @@ export async function POST(
 
     // 1. Record Delivery
     if (action === "record_delivery") {
-      const actualDelivery = deliveryDate ? new Date(deliveryDate) : new Date();
-
-      await prisma.$transaction(async (tx) => {
-        await tx.participant.update({
-          where: { id: participantId },
-          data: { status: "postnatal" },
-        });
-
-        const preg = await tx.pregnancy.findFirst({
-          where: { participantId },
-          orderBy: { id: "desc" },
-        });
-
-        if (preg) {
-          await tx.pregnancy.update({
-            where: { id: preg.id },
-            data: {
-              outcome: "live_birth",
-              deliveredAt: actualDelivery,
-              deliveryPlace: deliveryPlace || "Health Center",
-            },
-          });
-
-          await tx.baby.create({
-            data: {
-              pregnancyId: preg.id,
-              name: babyName || "Baby",
-              babyCode: `BABY-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-              dateOfBirth: actualDelivery,
-              status: "alive",
-            },
-          });
-        }
-
-        // Cancel pending antenatal messages
-        await tx.outboxMessage.updateMany({
-          where: {
-            participantId,
-            status: { in: ["pending", "queued"] },
-          },
-          data: {
-            status: "cancelled",
-            failureReason: "Cancelled due to delivery transition to postnatal care.",
-          },
-        });
-      });
-
-      // Plan postnatal messages
-      try {
-        await planSchedules();
-      } catch (e) {
-        console.warn("Postnatal plan warning:", e);
-      }
-
+      await recordDelivery({ participantId, deliveryDate, deliveryPlace, babyName });
       return NextResponse.json({ success: true, message: "Delivery recorded successfully" });
     }
 
@@ -267,32 +215,7 @@ export async function POST(
 
     // 3. Opt-Out
     if (action === "opt_out") {
-      await prisma.$transaction(async (tx) => {
-        await tx.participant.update({
-          where: { id: participantId },
-          data: { status: "opted_out" },
-        });
-
-        await tx.optOut.create({
-          data: {
-            participantId,
-            source: "web_ui",
-            reason: "Staff recorded participant opt-out request",
-          },
-        });
-
-        await tx.outboxMessage.updateMany({
-          where: {
-            participantId,
-            status: { in: ["pending", "queued"] },
-          },
-          data: {
-            status: "cancelled",
-            failureReason: "Participant opted out from SMS stream.",
-          },
-        });
-      });
-
+      await processOptOut(participantId, "web_ui", "Staff recorded participant opt-out request");
       return NextResponse.json({ success: true, message: "Participant successfully opted out" });
     }
 
@@ -306,8 +229,17 @@ export async function POST(
         where: { id: participantId },
         include: { phones: { where: { isPrimary: true } } },
       });
+      if (!participant) {
+        return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+      }
+      if (["opted_out", "loss"].includes(participant.status)) {
+        return NextResponse.json(
+          { error: `Cannot send SMS while participant status is "${participant.status}".` },
+          { status: 409 }
+        );
+      }
 
-      const phone = participant?.phones[0];
+      const phone = participant.phones[0];
       if (!phone) {
         return NextResponse.json({ error: "No primary phone registered for this mother" }, { status: 400 });
       }
@@ -350,68 +282,27 @@ export async function POST(
 
     // 5. Record Clinical Encounter / Visit
     if (action === "record_visit") {
-      if (appointmentId) {
-        const apt = await prisma.appointment.update({
-          where: { id: Number(appointmentId) },
-          data: {
-            status: "attended",
-            recordedBy: "admin",
-            notes: notes?.trim() || "Visit recorded by clinician",
-          },
-        });
-        return NextResponse.json({ success: true, appointment: apt });
-      }
-
-      const apt = await prisma.appointment.create({
-        data: {
-          participantId,
-          kind: visitKind === "pnc" ? "pnc" : "anc",
-          scheduledFor: visitDate ? new Date(visitDate) : new Date(),
-          status: "attended",
-          recordedBy: "admin",
-          notes: notes?.trim() || "Visit recorded by clinician",
-        },
+      const apt = await recordVisit({
+        participantId,
+        appointmentId: appointmentId ? Number(appointmentId) : null,
+        visitKind,
+        visitDate,
+        notes,
       });
       return NextResponse.json({ success: true, appointment: apt });
     }
 
     // 6. Update Primary Phone Number
     if (action === "update_phone") {
-      if (!phoneNumber || !phoneNumber.trim()) {
-        return NextResponse.json({ error: "Phone number is required" }, { status: 400 });
-      }
-      const normalized = phoneNumber.trim();
-      const phoneHash = crypto.createHash("sha256").update(normalized).digest("hex");
-      const existing = await prisma.participantPhone.findFirst({
-        where: { participantId, isPrimary: true },
-      });
-      if (existing) {
-        await prisma.participantPhone.update({
-          where: { id: existing.id },
-          data: {
-            numberE164: normalized,
-            phoneHash,
-            ownerType: ownerType || existing.ownerType,
-            failureCount: 0,
-          },
-        });
-      } else {
-        await prisma.participantPhone.create({
-          data: {
-            participantId,
-            numberE164: normalized,
-            phoneHash,
-            ownerType: ownerType || "self",
-            isPrimary: true,
-            failureCount: 0,
-          },
-        });
-      }
+      await updatePrimaryPhone({ participantId, phoneNumber, ownerType });
       return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (error: any) {
+    if (error instanceof DomainError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error("POST /api/mothers/[id] error:", error);
     return NextResponse.json({ error: error?.message || "Failed to update participant" }, { status: 500 });
   }

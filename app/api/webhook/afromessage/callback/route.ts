@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { assertOutboxTransition, OutboxStatus } from "@/lib/domain/stateMachines";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
     }
 
     const rawStatus = String(status || "").toLowerCase();
-    const mappedStatus = rawStatus.includes("deliver")
+    const mappedStatus: OutboxStatus = rawStatus.includes("deliver")
       ? "delivered"
       : rawStatus.includes("fail") || rawStatus.includes("reject")
       ? "failed"
@@ -30,13 +31,16 @@ export async function POST(request: Request) {
     });
 
     if (outboxMsg) {
-      await prisma.outboxMessage.update({
-        where: { id: outboxMsg.id },
-        data: {
-          status: mappedStatus,
-          deliveredAt: mappedStatus === "delivered" ? new Date() : undefined,
-        },
-      });
+      // Guard: never downgrade terminal delivered/cancelled states on out-of-order webhooks
+      if (assertOutboxTransition(outboxMsg.status, mappedStatus)) {
+        await prisma.outboxMessage.update({
+          where: { id: outboxMsg.id },
+          data: {
+            status: mappedStatus,
+            deliveredAt: mappedStatus === "delivered" ? new Date() : undefined,
+          },
+        });
+      }
 
       await prisma.deliveryEvent.create({
         data: {

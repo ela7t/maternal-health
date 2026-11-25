@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { assertAppointmentTransition, DomainError } from "@/lib/domain/stateMachines";
 
 export const dynamic = "force-dynamic";
 
@@ -81,10 +82,15 @@ export async function PATCH(request: Request) {
     }
 
     if (action === "attend") {
+      const existing = await prisma.appointment.findUnique({ where: { id: aptId } });
+      if (!existing) return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
+      assertAppointmentTransition(existing.status, "attended");
+
       const updated = await prisma.appointment.update({
         where: { id: aptId },
         data: {
           status: "attended",
+          recordedBy: "admin",
         },
       });
       return NextResponse.json({ success: true, appointment: updated });
@@ -97,6 +103,7 @@ export async function PATCH(request: Request) {
 
       const original = await prisma.appointment.findUnique({ where: { id: aptId } });
       if (!original) return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
+      assertAppointmentTransition(original.status, "rescheduled");
 
       const [oldApt, newApt] = await prisma.$transaction([
         prisma.appointment.update({
@@ -121,6 +128,9 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (error: any) {
+    if (error instanceof DomainError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error("PATCH /api/appointments error:", error);
     return NextResponse.json({ error: error?.message || "Failed to update appointment" }, { status: 500 });
   }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { calculateSmsSegments } from "@/lib/smsEncoding";
+import { assertTemplateTransition, DomainError, TemplateApprovalStatus } from "@/lib/domain/stateMachines";
 
 export async function POST(req: NextRequest) {
   try {
@@ -66,7 +67,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Invalid template id" }, { status: 400 });
     }
 
-    const statusMap: Record<string, string> = {
+    const statusMap: Record<string, TemplateApprovalStatus> = {
       submit_review: "in_review",
       approve: "approved",
       retire: "retired",
@@ -77,6 +78,12 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
+    const current = await prisma.messageTemplate.findUnique({ where: { id } });
+    if (!current) {
+      return NextResponse.json({ error: "Template not found" }, { status: 404 });
+    }
+    assertTemplateTransition(current.approvalStatus, nextStatus);
+
     const updated = await prisma.messageTemplate.update({
       where: { id },
       data: { approvalStatus: nextStatus },
@@ -84,6 +91,9 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ success: true, template: updated });
   } catch (err: any) {
+    if (err instanceof DomainError) {
+      return NextResponse.json({ error: err.message }, { status: err.statusCode });
+    }
     return NextResponse.json(
       { error: err.message || "Failed to update template status." },
       { status: 500 }

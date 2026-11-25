@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { ethiopianToGregorian, gregorianToEthiopian, formatEthiopianDate } from "@/lib/calendar/ethiopian";
 import { calculateEddFromLmp, calculateGestationalAge, calculatePostnatalAge } from "@/lib/clinical/gestational-age";
 import { planSchedules } from "@/lib/scheduler/dispatcher";
-import crypto from "crypto";
+import { hashPhone, normalizeEthiopianPhone } from "@/lib/domain/phone";
+import { DomainError } from "@/lib/domain/stateMachines";
 
 export const dynamic = "force-dynamic";
 
@@ -189,13 +190,9 @@ export async function POST(request: Request) {
       assignedFacilityId = defaultFacility.id;
     }
 
-    // Normalize phone number to E.164 (+251...)
-    let cleanPhone = String(actualPhone).replace(/\D/g, "");
-    if (cleanPhone.startsWith("0")) cleanPhone = "251" + cleanPhone.slice(1);
-    else if (!cleanPhone.startsWith("251")) cleanPhone = "251" + cleanPhone;
-    cleanPhone = "+" + cleanPhone;
-
-    const phoneHash = crypto.createHash("sha256").update(cleanPhone).digest("hex");
+    // Normalize & validate phone number to E.164 (+251[79]XXXXXXXX)
+    const cleanPhone = normalizeEthiopianPhone(actualPhone);
+    const phoneHash = hashPhone(cleanPhone);
     const publicCode = studyCode || `MOM-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
     // Study arm determination
@@ -269,6 +266,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, participantId: result.participant.id }, { status: 201 });
   } catch (error: any) {
+    if (error instanceof DomainError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error("POST /api/mothers error:", error);
     return NextResponse.json({ error: error?.message || "Failed to enroll mother" }, { status: 500 });
   }

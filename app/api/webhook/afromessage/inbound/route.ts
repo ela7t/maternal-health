@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { processOptOut } from "@/lib/scheduler/dispatcher";
+import { normalizeEthiopianPhone } from "@/lib/domain/phone";
+import { DomainError } from "@/lib/domain/stateMachines";
 
 export const dynamic = "force-dynamic";
 
@@ -21,10 +23,15 @@ export async function POST(request: Request) {
       trimmed.includes("አቁም");
 
     if (isStop) {
-      let cleanPhone = String(from).replace(/\D/g, "");
-      if (cleanPhone.startsWith("0")) cleanPhone = "251" + cleanPhone.slice(1);
-      else if (!cleanPhone.startsWith("251")) cleanPhone = "251" + cleanPhone;
-      cleanPhone = "+" + cleanPhone;
+      let cleanPhone: string;
+      try {
+        cleanPhone = normalizeEthiopianPhone(String(from));
+      } catch (e) {
+        if (e instanceof DomainError) {
+          return NextResponse.json({ acknowledge: true, optOutProcessed: false });
+        }
+        throw e;
+      }
 
       // Find participant with this phone
       const phoneRecord = await prisma.participantPhone.findFirst({

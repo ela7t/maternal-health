@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { calculateGestationalAge, calculatePostnatalAge, isOverdue } from "@/lib/clinical/gestational-age";
 import { calculateSmsSegments } from "@/lib/sms/ucs2-segment-counter";
 import { sendSms } from "@/lib/sms/afromessage";
+import { assertParticipantTransition } from "@/lib/domain/stateMachines";
 import crypto from "crypto";
 
 export interface PlanSchedulesResult {
@@ -441,73 +442,88 @@ export async function dispatchPendingMessages(asOf: Date = new Date()): Promise<
   return { sent, failed, retried };
 }
 
+async function haltParticipantCommunications(
+  participantId: number,
+  targetStatus: "opted_out" | "loss",
+  cancelReason: string,
+  extraTx?: (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => Promise<void>
+): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const participant = await tx.participant.findUnique({ where: { id: participantId } });
+    if (!participant) return;
+    if (participant.status === targetStatus) return; // Idempotent if already halted
+    assertParticipantTransition(participant.status, targetStatus);
+
+    await tx.participant.update({
+      where: { id: participantId },
+      data: { status: targetStatus },
+    });
+
+    if (extraTx) await extraTx(tx);
+
+    await tx.appointment.updateMany({
+      where: {
+        participantId,
+        status: { in: ["scheduled", "missed"] },
+      },
+      data: { status: "cancelled", notes: cancelReason },
+    });
+
+    await tx.outboxMessage.updateMany({
+      where: {
+        participantId,
+        status: { in: ["pending", "queued"] },
+      },
+      data: {
+        status: "cancelled",
+        failureReason: cancelReason,
+      },
+    });
+  });
+}
+
 /**
- * Halts all automated messages on Opt-Out.
+ * Halts all automated messages on Opt-Out atomically.
  */
 export async function processOptOut(
   participantId: number,
   source: string = "sms_reply",
   reason?: string
 ): Promise<void> {
-  await prisma.participant.update({
-    where: { id: participantId },
-    data: { status: "opted_out" },
-  });
-
-  await prisma.optOut.create({
-    data: {
-      participantId,
-      source,
-      reason,
-    },
-  });
-
-  // Cancel all pending or queued messages
-  await prisma.outboxMessage.updateMany({
-    where: {
-      participantId,
-      status: { in: ["pending", "queued"] },
-    },
-    data: {
-      status: "cancelled",
-      failureReason: "Cancelled due to participant opt-out.",
-    },
-  });
+  await haltParticipantCommunications(
+    participantId,
+    "opted_out",
+    "Cancelled due to participant opt-out.",
+    async (tx) => {
+      await tx.optOut.create({
+        data: { participantId, source, reason },
+      });
+    }
+  );
 }
 
 /**
- * Halts all automated messages on sensitive pregnancy loss / neonatal mortality.
+ * Halts all automated messages on sensitive pregnancy loss / neonatal mortality atomically.
  */
 export async function processPregnancyLoss(
   participantId: number,
   lossOutcome: string
 ): Promise<void> {
-  await prisma.participant.update({
-    where: { id: participantId },
-    data: { status: "loss" },
-  });
-
-  const preg = await prisma.pregnancy.findFirst({
-    where: { participantId },
-    orderBy: { id: "desc" },
-  });
-
-  if (preg) {
-    await prisma.pregnancy.update({
-      where: { id: preg.id },
-      data: { outcome: lossOutcome },
-    });
-  }
-
-  // Cancel all pending messages immediately
-  await prisma.outboxMessage.updateMany({
-    where: {
-      participantId,
-      status: { in: ["pending", "queued"] },
-    },
-    data: {
-      status: "cancelled",
-      failureReason: "Emergency halt due to pregnancy loss / neonatal mortality.",
-    },
-  });
+  await haltParticipantCommunications(
+    participantId,
+    "loss",
+    "Emergency halt due to pregnancy loss / neonatal mortality.",
+    async (tx) => {
+      const preg = await tx.pregnancy.findFirst({
+        where: { participantId },
+        orderBy: { id: "desc" },
+      });
+      if (preg) {
+        await tx.pregnancy.update({
+          where: { id: preg.id },
+          data: { outcome: lossOutcome },
+        });
+      }
+    }
+  );
 }
