@@ -30,21 +30,19 @@ export function SyncSchedulerTrigger() {
   return (
     <div>
       <form onSubmit={handleRun}>
-        <button type="submit" disabled={running} className="btn-medical shadow-sm">
-          {running ? (
-            <>
-              <span className="spinner-border spinner-border-sm me-1" role="status"></span>
-              Checking Queues...
-            </>
-          ) : (
-            <>
-              <i className="bi bi-arrow-repeat"></i> Trigger Scheduler Check
-            </>
-          )}
+        <button type="submit" disabled={running} className="btn btn-primary" style={{ minHeight: "44px" }}>
+          <svg className="icon-svg sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="23 4 23 10 17 10" />
+            <polyline points="1 20 1 14 7 14" />
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+          </svg>
+          <span>{running ? "Checking queues..." : "Trigger scheduler check"}</span>
         </button>
       </form>
       {message && (
-        <div className="small text-muted mt-1 text-end">{message}</div>
+        <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: "0.35rem", textAlign: "right" }}>
+          {message}
+        </div>
       )}
     </div>
   );

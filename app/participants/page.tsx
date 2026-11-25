@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { ArrowRight, Calendar, Filter, Search, UserPlus, Users } from "lucide-react";
 import prisma from "@/lib/prisma";
 import { calculateGestationalAge, calculatePostnatalAge } from "@/lib/ethiopianCalendar";
 
@@ -32,91 +31,89 @@ export default async function ParticipantsListPage({ searchParams }: Props) {
     ];
   }
 
-  const [participants, allCount, pregCount, pncCount, gradCount] = await Promise.all([
-    prisma.participant.findMany({
-      where,
-      include: {
-        facility: true,
-        phones: true,
-        pregnancies: {
-          orderBy: { id: "desc" },
-          take: 1,
+  const [participants, allCount, pregCount, pncCount, gradCount, optOutCount] =
+    await Promise.all([
+      prisma.participant.findMany({
+        where,
+        include: {
+          facility: true,
+          phones: true,
+          pregnancies: {
+            orderBy: { id: "desc" },
+            take: 1,
+          },
+          appointments: {
+            where: { status: "scheduled" },
+            orderBy: { scheduledFor: "asc" },
+            take: 1,
+          },
         },
-      },
-      orderBy: { enrolledAt: "desc" },
-    }),
-    prisma.participant.count(),
-    prisma.participant.count({ where: { status: "active_pregnant" } }),
-    prisma.participant.count({ where: { status: "postnatal" } }),
-    prisma.participant.count({ where: { status: "completed" } }),
-  ]);
+        orderBy: { enrolledAt: "desc" },
+      }),
+      prisma.participant.count(),
+      prisma.participant.count({ where: { status: "active_pregnant" } }),
+      prisma.participant.count({ where: { status: "postnatal" } }),
+      prisma.participant.count({ where: { status: "completed" } }),
+      prisma.participant.count({ where: { status: "opted_out" } }),
+    ]);
 
   const filterChips = [
     { key: "", label: "All", count: allCount },
     { key: "active_pregnant", label: "Pregnant", count: pregCount },
     { key: "postnatal", label: "Postnatal", count: pncCount },
     { key: "completed", label: "Graduated", count: gradCount },
+    { key: "opted_out", label: "Opted out", count: optOutCount },
   ];
 
+  const now = new Date();
+
   return (
-    <>
-      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+    <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
+      {/* Header matching women_list.html */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "1rem", marginBottom: "1.25rem" }}>
         <div>
-          <h1 className="h3 fw-bold mb-1">Mothers &amp; participants registry</h1>
-          <p className="mb-0 small" style={{ color: "var(--text-secondary)" }}>
-            Longitudinal tracking of registered pregnant and postpartum women across primary healthcare facilities.
+          <h1 className="page-title" style={{ margin: 0 }}>
+            Participant directory
+          </h1>
+          <p style={{ margin: "0.25rem 0 0 0", color: "var(--text-secondary)", fontSize: "0.875rem" }}>
+            Wolkite &amp; Jimma Primary Health Program &bull; Longitudinal cohort
           </p>
         </div>
-        <Link href="/participants/new" className="btn-medical">
-          <UserPlus size={16} />
-          <span>Register new mother</span>
+        <Link href="/participants/new" className="btn btn-primary" style={{ minHeight: "44px" }}>
+          <svg className="icon-svg sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          <span>Enroll mother</span>
         </Link>
       </div>
 
       {/* Search & Filter Chips Card */}
-      <div className="card-custom p-3 mb-4">
-        <form method="GET" action="/participants" className="row g-2 align-items-center mb-3">
-          <div className="col-md-5">
-            <div className="input-group">
-              <span className="input-group-text">
-                <Search size={16} />
-              </span>
-              <input
-                type="text"
-                name="q"
-                defaultValue={q}
-                className="form-control"
-                placeholder="Search by name, ID code (e.g. MOM-), or phone..."
-              />
-            </div>
-          </div>
-
-          <div className="col-md-4">
-            <select name="status" defaultValue={status} className="form-select">
-              <option value="">All care stages</option>
-              <option value="active_pregnant">Active pregnant</option>
-              <option value="postnatal">Postnatal care (0&ndash;6 weeks)</option>
-              <option value="completed">Completed (graduated)</option>
-              <option value="opted_out">Opted out (STOP)</option>
-              <option value="loss">Sensitive loss halt</option>
-            </select>
-          </div>
-
-          <div className="col-md-3 d-flex gap-2">
-            <button type="submit" className="btn btn-outline-secondary w-100 fw-semibold">
-              <Filter size={16} />
-              <span>Apply filters</span>
-            </button>
-            {(status || q) && (
-              <Link href="/participants" className="btn btn-light border">
-                Reset
-              </Link>
-            )}
-          </div>
+      <div className="card" style={{ padding: "16px 20px", marginBottom: "14px" }}>
+        <form method="GET" action="/participants" style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+          <input
+            type="text"
+            name="q"
+            defaultValue={q}
+            className="form-input"
+            style={{ flex: "1 1 280px", minHeight: "44px" }}
+            placeholder="Search by mother name, card code (MOM-), or phone..."
+          />
+          {status && <input type="hidden" name="status" value={status} />}
+          <button type="submit" className="btn btn-primary" style={{ minHeight: "44px", padding: "0 18px" }}>
+            Search
+          </button>
+          {(status || q) && (
+            <Link href="/participants" className="btn btn-outline" style={{ minHeight: "44px" }}>
+              Clear
+            </Link>
+          )}
         </form>
 
-        {/* 44px Quick Filter Chips with Pill Counts */}
-        <div className="d-flex flex-wrap gap-2 pt-2 border-top">
+        <div className="filter-chips-row" style={{ marginTop: "14px", paddingTop: "12px", borderTop: "1px solid var(--border-color)", display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginRight: "4px" }}>
+            Filter:
+          </span>
           {filterChips.map((chip) => {
             const isActive = status === chip.key;
             const href = chip.key
@@ -126,172 +123,126 @@ export default async function ParticipantsListPage({ searchParams }: Props) {
               <Link
                 key={chip.label}
                 href={href}
-                className={`btn ${isActive ? "btn-medical" : "btn-outline-secondary"}`}
+                className={`filter-chip ${isActive ? "active" : ""}`}
+                style={{ textDecoration: "none" }}
               >
                 <span>{chip.label}</span>
-                <span
-                  className="badge rounded-pill tabular-nums"
-                  style={{
-                    backgroundColor: isActive ? "rgba(255,255,255,0.22)" : "var(--bg-muted)",
-                    color: isActive ? "#ffffff" : "var(--text-primary)",
-                  }}
-                >
-                  {chip.count}
-                </span>
+                <span className="chip-count-pill tabular-nums">{chip.count}</span>
               </Link>
             );
           })}
         </div>
       </div>
 
-      {/* Table Card */}
-      <div className="card-custom overflow-hidden">
-        <div className="card-header-clean">
-          <span className="fw-bold tabular-nums">
-            Registered cohort ({participants.length})
-          </span>
-          <span className="small" style={{ color: "var(--text-secondary)" }}>
-            Wolkite &amp; Jimma Primary Centers
-          </span>
+      {/* Aligned CSS Grid Table (Exact women_list.html pattern) */}
+      <div className="directory-table-wrap">
+        <div className="directory-grid-header" role="row">
+          <div>Name / Card</div>
+          <div>GA (Weeks)</div>
+          <div>EDD</div>
+          <div>Next visit due</div>
+          <div>Status</div>
+          <div>Kebele</div>
+          <div style={{ textAlign: "right" }}>Actions</div>
         </div>
 
-        <div className="table-responsive">
-          <table className="table table-custom">
-            <thead>
-              <tr>
-                <th>Mother profile</th>
-                <th>Facility &amp; kebele</th>
-                <th>Clinical stage &amp; EDD</th>
-                <th>Phone (owner)</th>
-                <th>Status</th>
-                <th className="text-end">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {participants.map((p) => {
-                const preg = p.pregnancies[0];
-                const ph = p.phones.find((x) => x.isPrimary) || p.phones[0];
+        {participants.length === 0 ? (
+          <div style={{ padding: "3rem 1rem", textAlign: "center", color: "var(--text-muted)" }}>
+            No enrolled mothers match this filter.
+          </div>
+        ) : (
+          participants.map((p) => {
+            const preg = p.pregnancies[0];
+            const nextApt = p.appointments[0];
+            const ga = p.status === "active_pregnant" && preg?.eddDate ? calculateGestationalAge(preg.eddDate) : null;
+            const pnc = p.status === "postnatal" && preg?.deliveredAt ? calculatePostnatalAge(preg.deliveredAt) : null;
+            const isOverdue = nextApt && nextApt.scheduledFor < now;
 
-                let stageNode = (
-                  <span className="small" style={{ color: "var(--text-muted)" }}>
-                    &mdash;
+            return (
+              <div key={p.id} className="directory-row" role="row">
+                {/* 1. Name / Card */}
+                <div>
+                  <Link
+                    href={`/participants/${p.id}`}
+                    style={{ fontWeight: 700, color: "var(--text-primary)", textDecoration: "none", display: "block" }}
+                  >
+                    {p.fullName}
+                  </Link>
+                  <span className="mrn-badge tabular-nums" style={{ marginTop: "4px", display: "inline-block" }}>
+                    {p.publicCode}
                   </span>
-                );
-                if (p.status === "active_pregnant" && preg?.eddDate) {
-                  const ga = calculateGestationalAge(preg.eddDate);
-                  stageNode = (
+                </div>
+
+                {/* 2. GA (Weeks) */}
+                <div className="tabular-nums" style={{ fontSize: "0.875rem" }}>
+                  {ga ? (
                     <>
-                      <span className="badge-clinical pregnant tabular-nums">
-                        <Calendar size={13} /> {ga.formatted} (T{ga.trimester})
+                      <span className="badge badge-info" style={{ marginRight: "6px" }}>T{ga.trimester}</span>
+                      <strong>{ga.weeks}w {ga.days}d</strong>
+                    </>
+                  ) : pnc ? (
+                    <span>{pnc.formatted}</span>
+                  ) : (
+                    <span style={{ color: "var(--text-muted)" }}>&mdash;</span>
+                  )}
+                </div>
+
+                {/* 3. EDD */}
+                <div className="tabular-nums" style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+                  {preg?.eddDate
+                    ? preg.eddDate.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })
+                    : "—"}
+                </div>
+
+                {/* 4. Next Visit Due */}
+                <div className="tabular-nums" style={{ fontSize: "0.875rem" }}>
+                  {nextApt ? (
+                    isOverdue ? (
+                      <span className="badge badge-urgent">
+                        {nextApt.kind.toUpperCase()} &bull; Overdue
                       </span>
-                      <div className="small mt-1 tabular-nums" style={{ color: "var(--text-secondary)" }}>
-                        EDD:{" "}
-                        {preg.eddDate.toLocaleDateString("en-US", {
+                    ) : (
+                      <span>
+                        <strong>{nextApt.kind.toUpperCase()}</strong> &middot;{" "}
+                        {nextApt.scheduledFor.toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
-                          year: "numeric",
                         })}
-                      </div>
-                    </>
-                  );
-                } else if (p.status === "postnatal" && preg?.deliveredAt) {
-                  const pnc = calculatePostnatalAge(preg.deliveredAt);
-                  stageNode = (
-                    <span className="badge-clinical postnatal tabular-nums">
-                      {pnc.formatted}
-                    </span>
-                  );
-                }
-
-                return (
-                  <tr key={p.id}>
-                    <td>
-                      <div className="d-flex align-items-center gap-3">
-                        <div className="patient-avatar">
-                          {p.fullName ? p.fullName.charAt(0) : "M"}
-                        </div>
-                        <div>
-                          <Link
-                            href={`/participants/${p.id}`}
-                            className="fw-bold text-decoration-none d-block"
-                            style={{ color: "var(--text-primary)" }}
-                          >
-                            {p.fullName}
-                          </Link>
-                          <span
-                            className="small font-monospace tabular-nums"
-                            style={{ color: "var(--text-secondary)" }}
-                          >
-                            {p.publicCode}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="fw-semibold small">{p.facility?.name}</div>
-                      <span className="small" style={{ color: "var(--text-secondary)" }}>
-                        {formatKebele(p.kebele)}
                       </span>
-                    </td>
-                    <td>{stageNode}</td>
-                    <td>
-                      {ph ? (
-                        <>
-                          <div className="small fw-semibold tabular-nums">{ph.numberE164}</div>
-                          <span className="badge-clinical completed text-capitalize mt-1">
-                            {ph.ownerType}&apos;s phone
-                          </span>
-                        </>
-                      ) : (
-                        <span className="small" style={{ color: "var(--danger-text)" }}>
-                          No phone recorded
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      {p.status === "active_pregnant" && (
-                        <span className="badge-clinical pregnant">Pregnant</span>
-                      )}
-                      {p.status === "postnatal" && (
-                        <span className="badge-clinical postnatal">Postnatal</span>
-                      )}
-                      {p.status === "completed" && (
-                        <span className="badge-clinical completed">Graduated</span>
-                      )}
-                      {p.status === "opted_out" && (
-                        <span className="badge-clinical opted-out">Opted out</span>
-                      )}
-                      {p.status === "loss" && (
-                        <span className="badge-clinical missed">Sensitive loss</span>
-                      )}
-                      {!["active_pregnant", "postnatal", "completed", "opted_out", "loss"].includes(
-                        p.status
-                      ) && <span className="badge-clinical completed">{p.status}</span>}
-                    </td>
-                    <td className="text-end">
-                      <Link
-                        href={`/participants/${p.id}`}
-                        className="btn btn-outline-secondary fw-semibold"
-                      >
-                        <span>View</span>
-                        <ArrowRight size={15} />
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-              {participants.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="text-center py-5" style={{ color: "var(--text-secondary)" }}>
-                    <Users size={36} className="d-block mx-auto mb-2 opacity-50" />
-                    No enrolled mothers match this filter.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                    )
+                  ) : (
+                    <span style={{ color: "var(--text-muted)" }}>&mdash;</span>
+                  )}
+                </div>
+
+                {/* 5. Status (Empty for standard active pregnancy, badge for postnatal/graduated/opted_out/loss) */}
+                <div>
+                  {p.status === "postnatal" && <span className="badge badge-success">Postnatal</span>}
+                  {p.status === "completed" && <span className="badge badge-neutral">Graduated</span>}
+                  {p.status === "opted_out" && <span className="badge badge-warning">Opted out</span>}
+                  {p.status === "loss" && <span className="badge badge-urgent">Loss</span>}
+                </div>
+
+                {/* 6. Kebele */}
+                <div style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+                  {formatKebele(p.kebele)}
+                </div>
+
+                {/* 7. Actions (44px View button) */}
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <Link href={`/participants/${p.id}`} className="btn btn-outline btn-view-profile">
+                    View
+                  </Link>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
-    </>
+    </div>
   );
 }

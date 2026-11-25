@@ -43,65 +43,56 @@ export default async function AppointmentsListPage({ searchParams }: Props) {
     orderBy: { scheduledFor: "asc" },
   });
 
+  const filters = [
+    { key: "all", label: "All visits" },
+    { key: "today", label: "Today's clinic" },
+    { key: "scheduled", label: "Upcoming (72h SMS)" },
+    { key: "missed", label: "Missed follow-ups" },
+  ];
+
   return (
-    <>
-      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+    <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "1rem", marginBottom: "1.25rem" }}>
         <div>
-          <h1 className="h3 fw-bold mb-1">Antenatal &amp; postnatal checkups</h1>
-          <p className="mb-0 small" style={{ color: "var(--text-secondary)" }}>
+          <h1 className="page-title" style={{ margin: 0 }}>
+            Antenatal &amp; postnatal checkups
+          </h1>
+          <p style={{ margin: "0.25rem 0 0 0", color: "var(--text-secondary)", fontSize: "0.875rem" }}>
             Track scheduled clinic visits, record attendance, and follow up on missed checkups.
           </p>
         </div>
-        <div className="d-flex flex-wrap gap-2" role="group" aria-label="Visit filters">
-          <Link
-            href="/appointments?filter=all"
-            className={`btn ${currentFilter === "all" ? "btn-medical" : "btn-outline-secondary"}`}
-          >
-            All visits
-          </Link>
-          <Link
-            href="/appointments?filter=today"
-            className={`btn ${currentFilter === "today" ? "btn-medical" : "btn-outline-secondary"}`}
-          >
-            Today&apos;s clinic
-          </Link>
-          <Link
-            href="/appointments?filter=scheduled"
-            className={`btn ${currentFilter === "scheduled" ? "btn-medical" : "btn-outline-secondary"}`}
-          >
-            Upcoming (72h SMS)
-          </Link>
-          <Link
-            href="/appointments?filter=missed"
-            className={`btn ${currentFilter === "missed" ? "btn-danger" : "btn-outline-danger"}`}
-          >
-            <i className="bi bi-exclamation-circle-fill"></i>
-            <span>Missed follow-ups</span>
-          </Link>
+        <div className="filter-chips-row" style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          {filters.map((f) => (
+            <Link
+              key={f.key}
+              href={`/appointments?filter=${f.key}`}
+              className={`filter-chip ${currentFilter === f.key ? "active" : ""}`}
+              style={{ textDecoration: "none" }}
+            >
+              {f.label}
+            </Link>
+          ))}
         </div>
       </div>
 
-      <div className="card-custom overflow-hidden">
-        <div className="card-header-clean">
-          <span className="fw-bold tabular-nums">
-            <i className="bi bi-calendar2-check me-2"></i>
-            Visit appointments ({appointments.length})
-          </span>
-          <span className="small" style={{ color: "var(--text-secondary)" }}>
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <div className="card-header" style={{ padding: "1rem 1.25rem", marginBottom: 0 }}>
+          <h2 className="card-title tabular-nums">Visit appointments ({appointments.length})</h2>
+          <span style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
             72-hour reminders automated
           </span>
         </div>
 
         <div className="table-responsive">
-          <table className="table table-custom">
+          <table className="data-table">
             <thead>
               <tr>
-                <th>Mother Profile</th>
-                <th>Visit Stage</th>
-                <th>Scheduled Date</th>
+                <th>Mother profile</th>
+                <th>Visit stage</th>
+                <th>Scheduled date</th>
                 <th>Facility</th>
-                <th>Attendance Status</th>
-                <th className="text-end">Clinical Action</th>
+                <th>Attendance status</th>
+                <th style={{ textAlign: "right" }}>Clinical action</th>
               </tr>
             </thead>
             <tbody>
@@ -115,69 +106,46 @@ export default async function AppointmentsListPage({ searchParams }: Props) {
                 return (
                   <tr key={apt.id}>
                     <td>
-                      <div className="d-flex align-items-center gap-2">
-                        <div className="patient-avatar">
-                          {apt.participant.fullName ? apt.participant.fullName.charAt(0) : "M"}
-                        </div>
-                        <div>
-                          <Link
-                            href={`/participants/${apt.participant.id}`}
-                            className="fw-bold text-dark text-decoration-none d-block"
-                          >
-                            {apt.participant.fullName}
-                          </Link>
-                          <small className="text-muted">
-                            {ph ? ph.numberE164 : "No phone"}
-                          </small>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="badge bg-light text-dark border fw-semibold">
-                        {apt.kind === "anc" ? "Antenatal Checkup" : "Postnatal Checkup"}
+                      <Link
+                        href={`/participants/${apt.participant.id}`}
+                        style={{ fontWeight: 700, color: "var(--text-primary)", textDecoration: "none", display: "block" }}
+                      >
+                        {apt.participant.fullName}
+                      </Link>
+                      <span className="tabular-nums" style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+                        {ph ? ph.numberE164 : "No phone"}
                       </span>
                     </td>
                     <td>
-                      <div className="fw-bold text-slate-900">
+                      <span className="badge badge-info">
+                        {apt.kind === "anc" ? "Antenatal checkup" : "Postnatal checkup"}
+                      </span>
+                    </td>
+                    <td className="tabular-nums">
+                      <div style={{ fontWeight: 600 }}>
                         {apt.scheduledFor.toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
                           year: "numeric",
                         })}
                       </div>
-                      <small className="text-secondary">
+                      <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
                         {apt.scheduledFor.toLocaleTimeString("en-US", {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
-                      </small>
+                      </span>
+                    </td>
+                    <td style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+                      {apt.participant.facility.name}
                     </td>
                     <td>
-                      <span className="small text-secondary">{apt.participant.facility.name}</span>
+                      {displayStatus === "attended" && <span className="badge badge-success">Attended</span>}
+                      {displayStatus === "missed" && <span className="badge badge-urgent">Missed checkup</span>}
+                      {displayStatus === "rescheduled" && <span className="badge badge-warning">Rescheduled</span>}
+                      {displayStatus === "scheduled" && <span className="badge badge-info">Scheduled</span>}
                     </td>
-                    <td>
-                      {displayStatus === "attended" && (
-                        <span className="badge-clinical postnatal">
-                          <i className="bi bi-check2"></i> Attended
-                        </span>
-                      )}
-                      {displayStatus === "missed" && (
-                        <span className="badge-clinical missed">
-                          <i className="bi bi-exclamation-triangle"></i> Missed Checkup
-                        </span>
-                      )}
-                      {displayStatus === "rescheduled" && (
-                        <span className="badge-clinical opted-out">
-                          <i className="bi bi-arrow-repeat"></i> Rescheduled
-                        </span>
-                      )}
-                      {displayStatus === "scheduled" && (
-                        <span className="badge-clinical pregnant">
-                          <i className="bi bi-clock"></i> Scheduled
-                        </span>
-                      )}
-                    </td>
-                    <td className="text-end">
+                    <td style={{ textAlign: "right" }}>
                       <AppointmentTableActions
                         appointmentId={String(apt.id)}
                         participantName={apt.participant.fullName}
@@ -190,7 +158,7 @@ export default async function AppointmentsListPage({ searchParams }: Props) {
               })}
               {appointments.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center text-muted py-5">
+                  <td colSpan={6} style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--text-muted)" }}>
                     No visits found under this filter.
                   </td>
                 </tr>
@@ -199,6 +167,6 @@ export default async function AppointmentsListPage({ searchParams }: Props) {
           </table>
         </div>
       </div>
-    </>
+    </div>
   );
 }

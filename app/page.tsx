@@ -1,45 +1,31 @@
 import Link from "next/link";
-import {
-  AlertTriangle,
-  ArrowRight,
-  CalendarCheck2,
-  CheckCircle2,
-  ChevronRight,
-  Clock,
-  HeartPulse,
-  Radio,
-  ShieldCheck,
-  UserPlus,
-} from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { calculateGestationalAge } from "@/lib/ethiopianCalendar";
 import { SyncSchedulerButton } from "@/components/SyncSchedulerButton";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+function formatKebele(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  const cleaned = raw.replace(/^Kebele\s*:?\s*/i, "").trim();
+  return cleaned ? `Kebele ${cleaned}` : "—";
+}
+
+export default async function TodayPage() {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const nextWeek = new Date(startOfToday.getTime() + 7 * 24 * 3600 * 1000);
 
   const [
     activePregnant,
     activePostnatal,
-    completed,
-    totalEnrolled,
-    scheduledAppointments,
-    missedAppointmentsList,
-    optedOut,
-    lossCount,
-    totalSms,
-    sentSms,
+    missedAppointments,
+    visitsThisWeek,
+    failedSmsCount,
     recentMessages,
   ] = await Promise.all([
     prisma.participant.count({ where: { status: "active_pregnant" } }),
     prisma.participant.count({ where: { status: "postnatal" } }),
-    prisma.participant.count({ where: { status: "completed" } }),
-    prisma.participant.count(),
-    prisma.appointment.count({
-      where: { status: "scheduled", scheduledFor: { gte: startOfToday } },
-    }),
     prisma.appointment.findMany({
       where: {
         OR: [
@@ -49,408 +35,452 @@ export default async function DashboardPage() {
       },
       include: {
         participant: {
-          include: { phones: { where: { isPrimary: true } } },
+          include: {
+            facility: true,
+            phones: { where: { isPrimary: true } },
+            pregnancies: { orderBy: { id: "desc" }, take: 1 },
+          },
         },
       },
+      orderBy: { scheduledFor: "asc" },
+      take: 20,
     }),
-    prisma.participant.count({ where: { status: "opted_out" } }),
-    prisma.participant.count({ where: { status: "loss" } }),
-    prisma.outboxMessage.count(),
-    prisma.outboxMessage.count({
-      where: { status: { in: ["delivered", "sent", "submitted"] } },
+    prisma.appointment.findMany({
+      where: {
+        status: "scheduled",
+        scheduledFor: { gte: startOfToday, lte: nextWeek },
+      },
+      include: {
+        participant: {
+          include: {
+            facility: true,
+            phones: { where: { isPrimary: true } },
+            pregnancies: { orderBy: { id: "desc" }, take: 1 },
+          },
+        },
+      },
+      orderBy: { scheduledFor: "asc" },
+      take: 25,
     }),
+    prisma.outboxMessage.count({ where: { status: "failed" } }),
     prisma.outboxMessage.findMany({
       take: 8,
       orderBy: { scheduledAt: "desc" },
       include: {
-        participant: {
-          include: { facility: true },
-        },
+        participant: { include: { facility: true } },
         phone: true,
       },
     }),
   ]);
 
-  const missedAppointments = missedAppointmentsList.length;
-  const deliverySuccessRate =
-    totalSms > 0 ? Math.round((sentSms / totalSms) * 100) : null;
+  const missedCount = missedAppointments.length;
+  const visitsDueCount = visitsThisWeek.length;
+  const formattedToday = now.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  const ancWeeks = [16, 20, 26, 30, 34, 36, 38, 40];
 
   return (
-    <>
-      {/* Page Header */}
-      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+    <div className="today-container">
+      {/* Header: Strong Visual Hierarchy (Exact Django today.html) */}
+      <div className="today-header-row">
         <div>
-          <h1 className="h3 fw-bold mb-1">
-            Today&apos;s clinic &amp; messaging overview
-          </h1>
-          <p className="mb-0 small" style={{ color: "var(--text-secondary)" }}>
-            Monitoring registered mothers, appointment attendance, and automated prenatal/postnatal SMS streams.
+          <h1 className="today-main-title">Today&apos;s priorities</h1>
+          <p className="today-subtitle">
+            {formattedToday} &bull;{" "}
+            <span className="tabular-nums">{activePregnant + activePostnatal}</span> active mothers
           </p>
         </div>
-        <div className="d-flex gap-2 flex-wrap">
+        <div style={{ display: "flex", gap: "0.625rem", flexWrap: "wrap", alignItems: "center" }}>
           <SyncSchedulerButton />
-          <Link href="/participants/new" className="btn-medical">
-            <UserPlus size={16} />
-            <span>Register new mother</span>
+          <Link href="/participants/new" className="btn btn-primary btn-enroll-action">
+            <svg className="icon-svg sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            <span>Enroll pregnant mother</span>
           </Link>
         </div>
       </div>
 
-      {/* Clinical Triage Banner (Expanded when > 0, slim 44px strip when 0) */}
-      {missedAppointments > 0 ? (
-        <div className="action-banner danger">
-          <div className="d-flex align-items-center gap-3">
-            <AlertTriangle size={22} className="flex-shrink-0" />
-            <div>
-              <div className="fw-bold">
-                {missedAppointments} {missedAppointments === 1 ? "mother" : "mothers"} missed scheduled appointments
-              </div>
-              <div className="small">
-                An automatic rescheduling SMS was queued. Review and call to arrange a new visit date.
-              </div>
-            </div>
+      {/* 4 Actionable Triage Metric Cards */}
+      <div className="today-metrics-grid" role="region" aria-label="Triage metric categories">
+        {/* 1. Missed Visits */}
+        <a
+          href="#sec-missed-visits"
+          className={`today-metric-card ${missedCount === 0 ? "is-zero" : "has-urgent"}`}
+        >
+          <div className="metric-card-top">
+            <div className="metric-big-num tabular-nums">{missedCount}</div>
+            <svg className="metric-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
           </div>
-          <Link
-            href="/appointments?filter=missed"
-            className="btn btn-danger fw-semibold px-3 text-nowrap"
-          >
-            <span>Review missed visits</span>
-            <ArrowRight size={16} />
-          </Link>
-        </div>
-      ) : (
-        <div className="zero-strip">
-          <div className="d-flex align-items-center gap-2">
-            <CheckCircle2 size={18} style={{ color: "var(--success-text)" }} />
-            <span className="fw-medium">
-              All scheduled clinic visits are up to date &mdash; no missed appointments requiring tracing.
-            </span>
+          <div className="metric-title-line">
+            {missedCount > 0 && (
+              <svg className="icon-svg xs alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            )}
+            <span>Missed visits</span>
           </div>
-          <span className="badge-clinical postnatal tabular-nums">0 missed</span>
-        </div>
-      )}
+          <div className="metric-subtext">
+            {missedCount > 0 ? "Call and reschedule / trace" : "All visits attended on time"}
+          </div>
+        </a>
 
-      {/* 4 Actionable Clinical KPI Cards */}
-      <div className="row g-3 mb-4">
-        <div className="col-xl-3 col-md-6">
-          <Link
-            href="/participants?status=active_pregnant"
-            className={`kpi-card-link ${activePregnant === 0 ? "is-muted" : ""}`}
-          >
-            <div className="d-flex justify-content-between align-items-start">
-              <div>
-                <span className="kpi-label">Active pregnancies</span>
-                <div className="kpi-value">{activePregnant}</div>
-              </div>
-              <span className="badge-clinical pregnant">
-                <HeartPulse size={16} />
-              </span>
-            </div>
-            <div
-              className="mt-3 pt-2 border-top d-flex align-items-center justify-content-between small"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              <span>Receiving prenatal SMS</span>
-              <ChevronRight size={16} />
-            </div>
-          </Link>
-        </div>
+        {/* 2. Visits This Week */}
+        <a
+          href="#sec-visits-due"
+          className={`today-metric-card ${visitsDueCount === 0 ? "is-zero" : ""}`}
+        >
+          <div className="metric-card-top">
+            <div className="metric-big-num tabular-nums">{visitsDueCount}</div>
+            <svg className="metric-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </div>
+          <div className="metric-title-line">
+            {visitsDueCount > 0 && <span className="metric-dot amber" />}
+            <span>Visits this week</span>
+          </div>
+          <div className="metric-subtext">
+            {visitsDueCount > 0 ? "Scheduled next 7 days" : "No upcoming visits this week"}
+          </div>
+        </a>
 
-        <div className="col-xl-3 col-md-6">
-          <Link
-            href="/participants?status=postnatal"
-            className={`kpi-card-link ${activePostnatal === 0 ? "is-muted" : ""}`}
-          >
-            <div className="d-flex justify-content-between align-items-start">
-              <div>
-                <span className="kpi-label">Postnatal care (0&ndash;6 wks)</span>
-                <div className="kpi-value">{activePostnatal}</div>
-              </div>
-              <span className="badge-clinical postnatal">
-                <CheckCircle2 size={16} />
-              </span>
-            </div>
-            <div
-              className="mt-3 pt-2 border-top d-flex align-items-center justify-content-between small"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              <span>Newborn follow-up stream</span>
-              <ChevronRight size={16} />
-            </div>
-          </Link>
-        </div>
+        {/* 3. Active Care */}
+        <Link
+          href="/participants?status=active_pregnant"
+          className={`today-metric-card ${activePregnant === 0 ? "is-zero" : ""}`}
+        >
+          <div className="metric-card-top">
+            <div className="metric-big-num tabular-nums">{activePregnant}</div>
+            <svg className="metric-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </div>
+          <div className="metric-title-line">
+            <span>Active pregnancies</span>
+          </div>
+          <div className="metric-subtext tabular-nums">
+            {activePostnatal} in postnatal care
+          </div>
+        </Link>
 
-        <div className="col-xl-3 col-md-6">
-          <Link
-            href="/appointments?filter=scheduled"
-            className={`kpi-card-link ${scheduledAppointments === 0 ? "is-muted" : ""}`}
-          >
-            <div className="d-flex justify-content-between align-items-start">
-              <div>
-                <span className="kpi-label">Upcoming ANC visits</span>
-                <div className="kpi-value">{scheduledAppointments}</div>
-              </div>
-              <span className="badge-clinical pregnant">
-                <CalendarCheck2 size={16} />
-              </span>
-            </div>
-            <div
-              className="mt-3 pt-2 border-top d-flex align-items-center justify-content-between small"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              <span>72h advance reminders active</span>
-              <ChevronRight size={16} />
-            </div>
-          </Link>
-        </div>
-
-        <div className="col-xl-3 col-md-6">
-          <Link
-            href="/participants?status=completed"
-            className={`kpi-card-link ${completed === 0 ? "is-muted" : ""}`}
-          >
-            <div className="d-flex justify-content-between align-items-start">
-              <div>
-                <span className="kpi-label">Graduated cohort</span>
-                <div className="kpi-value">{completed}</div>
-              </div>
-              <span className="badge-clinical completed">
-                <ShieldCheck size={16} />
-              </span>
-            </div>
-            <div
-              className="mt-3 pt-2 border-top d-flex align-items-center justify-content-between small"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              <span className="tabular-nums">{totalEnrolled} total enrolled</span>
-              <ChevronRight size={16} />
-            </div>
-          </Link>
-        </div>
+        {/* 4. Phone / Gateway Problems */}
+        <Link
+          href={failedSmsCount > 0 ? "/outbox?status=failed" : "/outbox"}
+          className={`today-metric-card ${failedSmsCount === 0 ? "is-zero" : "has-urgent"}`}
+        >
+          <div className="metric-card-top">
+            <div className="metric-big-num tabular-nums">{failedSmsCount}</div>
+            <svg className="metric-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </div>
+          <div className="metric-title-line">
+            {failedSmsCount > 0 && (
+              <svg className="icon-svg xs alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            )}
+            <span>Phone problems</span>
+          </div>
+          <div className="metric-subtext">
+            {failedSmsCount > 0 ? "SMS delivery failures" : "All lines reachable"}
+          </div>
+        </Link>
       </div>
 
-      {/* Delivery Performance & Program Safety */}
-      <div className="row g-3 mb-4">
-        <div className="col-lg-8">
-          <div className="card-custom p-4 h-100">
-            <div className="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
-              <div>
-                <h2 className="h5 fw-bold mb-1 d-flex align-items-center gap-2">
-                  <Radio size={18} />
-                  <span>Automated SMS delivery health</span>
-                </h2>
-                <small style={{ color: "var(--text-secondary)" }}>
-                  Connected to Ethio Telecom &amp; Safaricom routes through AfroMessage gateway
-                </small>
-              </div>
-              <span className="badge-clinical postnatal">
-                <CheckCircle2 size={14} />
-                <span>Gateway online</span>
-              </span>
+      {/* SECTION 1: Missed Visits (Collapsed slim 44px strip when 0) */}
+      <section id="sec-missed-visits" style={{ marginBottom: "1rem" }}>
+        {missedCount === 0 ? (
+          <div className="zero-state-strip">
+            <div className="zero-state-left">
+              <svg className="zero-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span className="zero-title">Missed visits</span>
+              <span className="zero-sub">All scheduled appointments attended on time</span>
             </div>
-
-            <div className="row g-3 my-1">
-              <div className="col-sm-4">
-                <div className="p-3 rounded border bg-light text-center">
-                  <div className="small fw-medium" style={{ color: "var(--text-secondary)" }}>
-                    Messages dispatched
-                  </div>
-                  <div className="fs-3 fw-bold mt-1 tabular-nums">{totalSms}</div>
-                  <div className="small" style={{ color: "var(--text-muted)" }}>
-                    Total automated SMS
-                  </div>
-                </div>
+            <span className="zero-count-pill tabular-nums">0</span>
+          </div>
+        ) : (
+          <div className="priority-section urgent">
+            <div className="section-header-bar">
+              <div className="section-title-group">
+                <svg className="icon-svg sm" style={{ color: "var(--status-urgent-accent)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <h2>Missed visits requiring follow-up</h2>
               </div>
-              <div className="col-sm-4">
-                <div className="p-3 rounded border bg-light text-center">
-                  <div className="small fw-medium" style={{ color: "var(--text-secondary)" }}>
-                    Successfully delivered
-                  </div>
-                  <div
-                    className="fs-3 fw-bold mt-1 tabular-nums"
-                    style={{ color: sentSms > 0 ? "var(--success-text)" : "var(--text-primary)" }}
-                  >
-                    {sentSms}
-                  </div>
-                  <div className="small" style={{ color: "var(--text-muted)" }}>
-                    Confirmed by network
-                  </div>
-                </div>
-              </div>
-              <div className="col-sm-4">
-                <div className="p-3 rounded border bg-light text-center">
-                  <div className="small fw-medium" style={{ color: "var(--text-secondary)" }}>
-                    Delivery rate
-                  </div>
-                  <div
-                    className="fs-3 fw-bold mt-1 tabular-nums"
-                    style={{
-                      color:
-                        deliverySuccessRate !== null && deliverySuccessRate >= 95
-                          ? "var(--success-text)"
-                          : "var(--text-primary)",
-                    }}
-                  >
-                    {deliverySuccessRate !== null ? `${deliverySuccessRate}%` : "—"}
-                  </div>
-                  <div className="small" style={{ color: "var(--text-muted)" }}>
-                    {deliverySuccessRate !== null ? "Target: > 95%" : "No data yet"}
-                  </div>
-                </div>
-              </div>
+              <span className="badge badge-urgent tabular-nums">{missedCount}</span>
             </div>
+            <div className="priority-list">
+              {missedAppointments.map((apt) => {
+                const ph = apt.participant.phones[0];
+                return (
+                  <div key={apt.id} className="priority-row">
+                    <div className="row-main-info">
+                      <div className="row-title-line">
+                        <Link href={`/participants/${apt.participant.id}`} className="row-patient-name">
+                          {apt.participant.fullName}
+                        </Link>
+                        <span className="mrn-badge">{apt.participant.publicCode}</span>
+                        <span className="badge badge-urgent">
+                          {apt.kind === "anc" ? "ANC Missed" : "PNC Missed"}
+                        </span>
+                      </div>
+                      <div className="row-meta-line">
+                        <span>{formatKebele(apt.participant.kebele)}</span>
+                        <span>&bull;</span>
+                        <span>{apt.participant.facility.name}</span>
+                        <span>&bull;</span>
+                        <span className="tabular-nums">
+                          Due{" "}
+                          {apt.scheduledFor.toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </span>
+                        {ph && (
+                          <>
+                            <span>&bull;</span>
+                            <span className="tabular-nums">{ph.numberE164}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="row-actions">
+                      <Link
+                        href={`/appointments?filter=missed`}
+                        className="btn btn-primary"
+                        style={{ minHeight: "44px" }}
+                      >
+                        Review &amp; reschedule
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </section>
 
-            <div className="mt-3 p-3 rounded bg-light border d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2">
-              <div className="small d-flex align-items-center gap-2" style={{ color: "var(--text-secondary)" }}>
-                <Clock size={15} />
-                <span>
-                  Sending windows: <strong>8:00 AM &ndash; 10:00 AM</strong> and{" "}
-                  <strong>7:00 PM</strong> (Addis Ababa)
-                </span>
+      {/* SECTION 2: Phone Problems (Collapsed slim 44px strip when 0) */}
+      <section id="sec-phone-problems" style={{ marginBottom: "1.5rem" }}>
+        {failedSmsCount === 0 ? (
+          <div className="zero-state-strip">
+            <div className="zero-state-left">
+              <svg className="zero-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span className="zero-title">Phone problems</span>
+              <span className="zero-sub">All participant phone numbers reachable</span>
+            </div>
+            <span className="zero-count-pill tabular-nums">0</span>
+          </div>
+        ) : (
+          <div className="priority-section urgent">
+            <div className="section-header-bar">
+              <div className="section-title-group">
+                <h2>Phone problems</h2>
               </div>
-              <Link href="/outbox" className="btn btn-outline-secondary text-nowrap">
-                View outbox details
+              <Link href="/outbox?status=failed" className="btn btn-primary" style={{ minHeight: "44px" }}>
+                Inspect {failedSmsCount} failed SMS
               </Link>
             </div>
           </div>
+        )}
+      </section>
+
+      {/* SECTION 3: Visits This Week (With Gestational Week 12-42 Tracker) */}
+      <section id="sec-visits-due" className="priority-section">
+        <div className="section-header-bar">
+          <div className="section-title-group">
+            <svg className="icon-svg sm" style={{ color: "var(--text-secondary)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            <h2>Visits this week</h2>
+          </div>
+          <span className="badge badge-neutral tabular-nums">{visitsDueCount}</span>
         </div>
 
-        <div className="col-lg-4">
-          <div className="card-custom p-4 h-100">
-            <h2 className="h5 fw-bold mb-3 d-flex align-items-center gap-2">
-              <ShieldCheck size={18} />
-              <span>Program safety &amp; privacy</span>
-            </h2>
-            <ul className="list-unstyled mb-0">
-              <li className="d-flex justify-content-between align-items-center py-2 border-bottom">
-                <div>
-                  <div className="fw-semibold small">Shared phone protection</div>
-                  <small style={{ color: "var(--text-secondary)" }}>
-                    No PII or diagnosis in SMS body
-                  </small>
-                </div>
-                <span className="badge-clinical postnatal">
-                  <CheckCircle2 size={13} /> Active
-                </span>
-              </li>
-              <li className="d-flex justify-content-between align-items-center py-2 border-bottom">
-                <div>
-                  <div className="fw-semibold small">Opt-out requests</div>
-                  <small style={{ color: "var(--text-secondary)" }}>
-                    Mothers replied STOP / አቁም
-                  </small>
-                </div>
-                <span className="badge-clinical completed tabular-nums">{optedOut}</span>
-              </li>
-              <li className="d-flex justify-content-between align-items-center py-2">
-                <div>
-                  <div className="fw-semibold small">Sensitive branch flags</div>
-                  <small style={{ color: "var(--text-secondary)" }}>
-                    Immediate halt on pregnancy loss
-                  </small>
-                </div>
-                <span className={`badge-clinical ${lossCount > 0 ? "missed" : "completed"} tabular-nums`}>
-                  {lossCount}
-                </span>
-              </li>
-            </ul>
+        {visitsDueCount === 0 ? (
+          <div style={{ padding: "2rem 1.5rem", textAlign: "center", color: "var(--text-muted)" }}>
+            No clinic visits scheduled in the next 7 days.{" "}
+            <Link href="/appointments" style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+              View all scheduled visits
+            </Link>
           </div>
-        </div>
-      </div>
+        ) : (
+          <div className="priority-list">
+            {visitsThisWeek.map((apt) => {
+              const preg = apt.participant.pregnancies[0];
+              const gaInfo = preg?.eddDate ? calculateGestationalAge(preg.eddDate) : null;
+              const gaWeeks = gaInfo ? Math.min(42, Math.max(12, gaInfo.weeks)) : null;
+              const pct = gaWeeks !== null ? ((gaWeeks - 12) / 30) * 100 : null;
 
-      {/* Recent Mother Activity Table */}
-      <div className="card-custom overflow-hidden">
-        <div className="card-header-clean">
-          <div className="d-flex align-items-center gap-2">
-            <Clock size={16} />
-            <span>Recent automated messages</span>
+              return (
+                <div key={apt.id} className="priority-row" style={{ flexDirection: "column", alignItems: "stretch", gap: "0.75rem" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem" }}>
+                    <div className="row-main-info">
+                      <div className="row-title-line">
+                        <Link href={`/participants/${apt.participant.id}`} className="row-patient-name">
+                          {apt.participant.fullName}
+                        </Link>
+                        <span className="mrn-badge">{apt.participant.publicCode}</span>
+                        <span className={`badge ${apt.kind === "anc" ? "badge-info" : "badge-success"}`}>
+                          {apt.kind === "anc" ? "ANC Visit" : "PNC Visit"}
+                        </span>
+                        {gaInfo && (
+                          <span className="badge badge-neutral tabular-nums">
+                            {gaInfo.formatted}
+                          </span>
+                        )}
+                      </div>
+                      <div className="row-meta-line">
+                        <span>{formatKebele(apt.participant.kebele)}</span>
+                        <span>&bull;</span>
+                        <span>{apt.participant.facility.name}</span>
+                        <span>&bull;</span>
+                        <span className="tabular-nums">
+                          {apt.scheduledFor.toLocaleDateString("en-US", {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="row-actions">
+                      <Link
+                        href={`/participants/${apt.participant.id}`}
+                        className="btn btn-primary"
+                        style={{ minHeight: "44px" }}
+                      >
+                        Record visit
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* Gestational Week 12-42 Tracker */}
+                  {gaWeeks !== null && pct !== null && (
+                    <div className="gt-wrapper">
+                      <div className="gt-desktop-view">
+                        <div className="continuum-scale-bar">
+                          <div
+                            className="continuum-scale-fill"
+                            style={{ width: `${pct}%` }}
+                          />
+                          {ancWeeks.map((wk) => {
+                            const tickPct = ((wk - 12) / 30) * 100;
+                            const isPast = wk <= gaWeeks;
+                            return (
+                              <div
+                                key={wk}
+                                className={`gt-tick ${isPast ? "is-attended" : "is-upcoming"}`}
+                                style={{ left: `${tickPct}%` }}
+                                title={`Week ${wk}`}
+                              >
+                                <span className="gt-tick-dot">
+                                  {isPast ? "✓" : ""}
+                                </span>
+                                <span className="gt-tick-label tabular-nums">{wk}w</span>
+                              </div>
+                            );
+                          })}
+                          <div className="gt-here-pin" style={{ left: `${pct}%` }}>
+                            <span className="gt-here-badge tabular-nums">Week {gaInfo?.weeks}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="gt-mobile-view">
+                        <div className="gt-mobile-bar">
+                          <div className="gt-mobile-fill" style={{ width: `${pct}%` }} />
+                        </div>
+                        <div className="gt-mobile-text tabular-nums">
+                          Week {gaInfo?.weeks} of 42 &bull; Next checkup{" "}
+                          {apt.scheduledFor.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-          <Link href="/outbox" className="btn btn-outline-secondary">
-            See all messages
+        )}
+      </section>
+
+      {/* Recent SMS Activity */}
+      <section className="card" style={{ marginTop: "1.5rem", padding: 0, overflow: "hidden" }}>
+        <div className="card-header" style={{ padding: "1rem 1.25rem", marginBottom: 0 }}>
+          <h2 className="card-title">Recent automated SMS dispatches</h2>
+          <Link href="/outbox" className="btn btn-outline" style={{ minHeight: "44px" }}>
+            View full SMS log
           </Link>
         </div>
-
         <div className="table-responsive">
-          <table className="table table-custom">
+          <table className="data-table">
             <thead>
               <tr>
                 <th>Mother</th>
-                <th>Facility &amp; phone</th>
-                <th>Message sent</th>
-                <th>Segments</th>
-                <th>Delivery status</th>
-                <th>Scheduled for</th>
+                <th>Message</th>
+                <th>Status</th>
+                <th>Scheduled</th>
               </tr>
             </thead>
             <tbody>
               {recentMessages.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-5" style={{ color: "var(--text-secondary)" }}>
-                    No recent outbox activity. Register a mother to initiate automated scheduling.
+                  <td colSpan={4} style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>
+                    No recent SMS activity.
                   </td>
                 </tr>
               ) : (
                 recentMessages.map((msg) => (
                   <tr key={msg.id}>
                     <td>
-                      <div className="d-flex align-items-center gap-2">
-                        <div className="patient-avatar">
-                          {msg.participant.fullName ? msg.participant.fullName.slice(0, 1) : "M"}
-                        </div>
-                        <div>
-                          <Link
-                            href={`/participants/${msg.participant.id}`}
-                            className="fw-bold text-decoration-none d-block"
-                            style={{ color: "var(--text-primary)" }}
-                          >
-                            {msg.participant.fullName}
-                          </Link>
-                          <span className="small tabular-nums" style={{ color: "var(--text-secondary)" }}>
-                            {msg.participant.publicCode}
-                          </span>
-                        </div>
+                      <Link
+                        href={`/participants/${msg.participant.id}`}
+                        style={{ fontWeight: 600, color: "var(--text-primary)", textDecoration: "none" }}
+                      >
+                        {msg.participant.fullName}
+                      </Link>
+                      <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }} className="tabular-nums">
+                        {msg.participant.publicCode}
                       </div>
                     </td>
-                    <td>
-                      <div className="small fw-semibold">{msg.participant.facility.name}</div>
-                      <small className="tabular-nums" style={{ color: "var(--text-secondary)" }}>
-                        {msg.phone?.numberE164} (
-                        {msg.phone?.ownerType
-                          ? msg.phone.ownerType.charAt(0).toUpperCase() + msg.phone.ownerType.slice(1)
-                          : "Self"}
-                        )
-                      </small>
-                    </td>
-                    <td style={{ maxWidth: "360px" }}>
-                      <div className="small text-truncate" title={msg.messageContent}>
-                        {msg.messageContent}
-                      </div>
-                    </td>
-                    <td>
-                      <span className="badge-clinical completed tabular-nums">
-                        {msg.segments} {msg.segments === 1 ? "segment" : "segments"}
-                      </span>
+                    <td style={{ maxWidth: "360px", fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+                      {msg.messageContent}
                     </td>
                     <td>
                       {msg.status === "sent" || msg.status === "delivered" || msg.status === "submitted" ? (
-                        <span className="badge-clinical postnatal">
-                          <i className="bi bi-check2"></i> Delivered
-                        </span>
-                      ) : msg.status === "pending" || msg.status === "queued" ? (
-                        <span className="badge-clinical opted-out">
-                          <i className="bi bi-hourglass-split"></i> Queued
-                        </span>
-                      ) : msg.status === "cancelled" ? (
-                        <span className="badge-clinical completed">
-                          <i className="bi bi-dash-circle"></i> Cancelled
-                        </span>
+                        <span className="badge badge-success">Delivered</span>
+                      ) : msg.status === "failed" ? (
+                        <span className="badge badge-urgent">Failed</span>
                       ) : (
-                        <span className="badge-clinical missed">
-                          <i className="bi bi-x-circle"></i> Failed
-                        </span>
+                        <span className="badge badge-info">Queued</span>
                       )}
                     </td>
-                    <td className="small tabular-nums" style={{ color: "var(--text-secondary)" }}>
+                    <td className="tabular-nums" style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
                       {new Date(msg.scheduledAt).toLocaleDateString("en-US", {
                         month: "short",
                         day: "numeric",
@@ -464,7 +494,7 @@ export default async function DashboardPage() {
             </tbody>
           </table>
         </div>
-      </div>
-    </>
+      </section>
+    </div>
   );
 }

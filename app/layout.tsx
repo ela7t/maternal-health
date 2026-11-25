@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Activity, MapPin, Radio, UserPlus } from "lucide-react";
 import "./globals.css";
 import { NavLinks } from "@/components/NavLinks";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const metadata: Metadata = {
-  title: "Clinical overview - Maternal & Newborn Care",
+  title: "Maternal & Newborn Care",
   description: "Automated SMS Reminder System for Maternal and Newborn Health",
 };
 
@@ -18,79 +17,65 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme')||(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`,
-          }}
-        />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <meta name="theme-color" content="#0f766e" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Ethiopic:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=Noto+Sans+Ethiopic:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
-        <link
-          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-          rel="stylesheet"
-        />
-        <link
-          rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme')||(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(t==='dark')document.documentElement.classList.add('dark-theme');}catch(e){}})();`,
+          }}
         />
       </head>
-      <body>
-        {/* Top Clinical Header */}
-        <header className="clinic-header">
-          <div className="d-flex align-items-center gap-3 flex-wrap">
-            <Link href="/" className="d-flex align-items-center gap-2 text-decoration-none">
-              <span className="brand-mark-box">
-                <Activity size={20} strokeWidth={2.5} />
-              </span>
-              <div>
-                <span className="brand-title d-block">
-                  Maternal &amp; Newborn Care
+      <body className="app-shell">
+        {/* Single-Row Minimalist Clinical Header (Exact Django base.html Layout) */}
+        <header className="app-header">
+          <div className="header-container">
+            <div className="header-left">
+              <Link href="/" className="brand-wrapper" aria-label="Maternal SMS Home" title="Maternal & Newborn Care">
+                <svg className="brand-pulse-icon" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                </svg>
+                <span className="brand-title">
+                  <span className="brand-full">Maternal &amp; Newborn</span>
+                  <span className="brand-short">Maternal</span>
                 </span>
-                <small className="brand-subtitle d-block">
-                  Wolkite &amp; Jimma Primary Health Program
-                </small>
-              </div>
-            </Link>
-            <span className="facility-pill d-none d-md-inline-flex">
-              <MapPin size={14} />
-              <span>Wolkite Health Center</span>
-            </span>
-          </div>
+              </Link>
 
-          <div className="d-flex align-items-center gap-2">
-            <span className="gateway-pill d-none d-lg-inline-flex">
-              <Radio size={14} className="text-success" />
-              <span>SMS gateway: <strong>AfroMessage ready</strong></span>
-            </span>
-            <ThemeToggle />
-            <Link href="/participants/new" className="btn-medical">
-              <UserPlus size={16} />
-              <span>Register mother</span>
-            </Link>
+              <div className="header-divider" />
+
+              <NavLinks />
+            </div>
+
+            <div className="header-actions">
+              <ThemeToggle />
+              <Link href="/participants/new" className="btn-enroll-nav">
+                <svg className="icon-svg sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                <span className="btn-enroll-text">Enroll Mother</span>
+              </Link>
+            </div>
           </div>
         </header>
 
-        {/* Main Navigation Bar */}
-        <NavLinks />
+        {/* Main Workspace Container */}
+        <main className="main-container">{children}</main>
 
-        {/* Content Workspace */}
-        <main className="container-fluid px-3 px-md-4 py-4 flex-grow-1 workspace-shell">
-          {children}
-        </main>
-
-        {/* Clinician Footer */}
-        <footer className="clinic-footer mt-auto">
-          <div className="container-fluid px-3 px-md-4 d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
-            <div>
-              <strong>Automated Maternal &amp; Newborn SMS System</strong> &bull; Jimma &amp; Wolkite Clinical Model
-            </div>
-            <div className="footer-meta">
-              Ethio Telecom &amp; Safaricom routing &bull; UCS-2 Ge&apos;ez safe &bull; Patient phone privacy compliant
-            </div>
+        {/* Footer */}
+        <footer className="app-footer">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem", maxWidth: "1280px", margin: "0 auto" }}>
+            <span>
+              <strong>Maternal &amp; Newborn Care</strong> &bull; Wolkite &amp; Jimma Primary Health Program
+            </span>
+            <span style={{ color: "var(--text-muted)" }}>
+              Ethio Telecom &amp; Safaricom &bull; Dual Calendar (E.C. / G.C.)
+            </span>
           </div>
         </footer>
       </body>

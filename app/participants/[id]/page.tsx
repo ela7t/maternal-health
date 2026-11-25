@@ -15,6 +15,12 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
+function formatKebele(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  const cleaned = raw.replace(/^Kebele\s*:?\s*/i, "").trim();
+  return cleaned ? `Kebele ${cleaned}` : "—";
+}
+
 export default async function ParticipantShowPage({ params }: Props) {
   const { id } = await params;
 
@@ -58,440 +64,392 @@ export default async function ParticipantShowPage({ params }: Props) {
     eddEth = {
       formatted_am: formatEthiopianDate(eth, "am"),
       formatted_en: formatEthiopianDate(eth, "en"),
-      month_name_en: eth.month,
     };
   }
 
+  const pncInfo =
+    participant.status === "postnatal" && pregnancy?.deliveredAt
+      ? calculatePostnatalAge(pregnancy.deliveredAt)
+      : null;
+
+  const ancNodes = [
+    { label: "16w", week: 16 },
+    { label: "20w", week: 20 },
+    { label: "26w", week: 26 },
+    { label: "30w", week: 30 },
+    { label: "34w", week: 34 },
+    { label: "36w", week: 36 },
+    { label: "38w", week: 38 },
+    { label: "42w", week: 42 },
+  ];
+  const pncNodes = [
+    { label: "24h", day: 1 },
+    { label: "3d", day: 3 },
+    { label: "7-14d", day: 10 },
+    { label: "6w", day: 42 },
+  ];
+
+  const currentGaWeeks = gaInfo ? gaInfo.weeks : 0;
+  const delivered = Boolean(pregnancy?.deliveredAt) || participant.status === "postnatal" || participant.status === "completed";
+  const nextAppointment = participant.appointments.find((a) => a.status === "scheduled");
+
   return (
-    <>
-      {/* Patient Header */}
-      <div className="card-custom p-4 mb-4">
-        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
-          <div className="d-flex align-items-center gap-3">
-            <div className="patient-avatar fs-4" style={{ width: 52, height: 52 }}>
-              {participant.fullName ? participant.fullName.charAt(0) : "M"}
-            </div>
-            <div>
-              <div className="d-flex align-items-center gap-2">
-                <h3 className="fw-bold mb-0 text-slate-900">{participant.fullName}</h3>
-                <span className="badge bg-light text-secondary border font-monospace">
-                  {participant.publicCode}
-                </span>
-              </div>
-              <div className="text-secondary small mt-1">
-                <i className="bi bi-geo-alt me-1"></i> {participant.facility.name} &bull;{" "}
-                {participant.kebele} &bull; Enrolled:{" "}
-                {participant.enrolledAt.toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </div>
-            </div>
+    <div className="patient-profile-wrapper">
+      {/* Back to Directory */}
+      <div style={{ marginBottom: "1rem" }}>
+        <Link
+          href="/participants"
+          style={{
+            color: "var(--text-secondary)",
+            textDecoration: "none",
+            fontSize: "0.8125rem",
+            fontWeight: 600,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.375rem",
+            minHeight: "44px",
+          }}
+        >
+          <svg className="icon-svg sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+          <span>Back to Directory</span>
+        </Link>
+      </div>
+
+      {/* Unified Patient Hero Card (Exact woman_detail.html) */}
+      <div className="patient-hero-card" id="patient-hero">
+        <div className="hero-name-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
+          <div className="hero-name-group" style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+            <h1 className="patient-hero-title" style={{ margin: 0, fontSize: "1.75rem" }}>
+              {participant.fullName}
+            </h1>
+            <span className="mrn-badge tabular-nums">{participant.publicCode}</span>
+            {pregnancy?.riskStatus === "high" && (
+              <span className="badge badge-urgent">High Risk</span>
+            )}
+            {pregnancy?.riskStatus === "elevated" && (
+              <span className="badge badge-warning">Elevated Risk</span>
+            )}
+            {participant.status === "postnatal" && (
+              <span className="badge badge-success">Postpartum</span>
+            )}
+            {participant.status === "completed" && (
+              <span className="badge badge-neutral">Graduated</span>
+            )}
+            {participant.status === "opted_out" && (
+              <span className="badge badge-warning">Opted out</span>
+            )}
+            {participant.status === "loss" && (
+              <span className="badge badge-urgent">Sensitive loss</span>
+            )}
           </div>
 
-          {/* Clinical State & Action Buttons */}
-          <div className="d-flex align-items-center gap-2">
+          <div className="hero-action-group" style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
             <ParticipantActions
               participantId={String(participant.id)}
               status={participant.status}
               facilityName={participant.facility.name}
             />
-            <Link
-              href="/participants"
-              className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1"
-            >
-              <i className="bi bi-arrow-left"></i> Registry
-            </Link>
           </div>
         </div>
 
-        {/* Longitudinal Maternity Stepper */}
-        <div className="mt-4 pt-3 border-top">
-          <div className="stepper-container">
-            <div
-              className={`step-item ${gaInfo && gaInfo.trimester >= 1 ? "completed" : ""}`}
-            >
-              <span className="step-dot">1</span>
-              <span className="step-label">
-                1st Trimester
-                <br />
-                <small className="text-muted">(1–13 wks)</small>
+        {/* Hero Meta Row */}
+        <div
+          className="hero-meta-row"
+          style={{
+            marginTop: "14px",
+            paddingTop: "14px",
+            borderTop: "1px solid var(--border-color)",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "14px 24px",
+            fontSize: "0.875rem",
+          }}
+        >
+          {gaInfo && (
+            <div>
+              <span style={{ color: "var(--text-muted)", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", display: "block" }}>
+                Gestational age
+              </span>
+              <strong className="tabular-nums" style={{ color: "var(--text-primary)" }}>
+                {gaInfo.formatted}
+              </strong>{" "}
+              <span style={{ color: "var(--text-secondary)", fontSize: "0.8125rem" }}>
+                (Trimester {gaInfo.trimester})
               </span>
             </div>
-            <div
-              className={`step-item ${
-                gaInfo && gaInfo.trimester === 2
-                  ? "active"
-                  : gaInfo && gaInfo.trimester > 2 || participant.status === "postnatal"
-                  ? "completed"
-                  : ""
-              }`}
-            >
-              <span className="step-dot">2</span>
-              <span className="step-label">
-                2nd Trimester
-                <br />
-                <small className="text-muted">(14–27 wks)</small>
+          )}
+          {pncInfo && (
+            <div>
+              <span style={{ color: "var(--text-muted)", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", display: "block" }}>
+                Postpartum age
+              </span>
+              <strong className="tabular-nums" style={{ color: "var(--text-primary)" }}>
+                {pncInfo.formatted}
+              </strong>
+            </div>
+          )}
+          {pregnancy?.eddDate && (
+            <div>
+              <span style={{ color: "var(--text-muted)", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", display: "block" }}>
+                Due date (EDD)
+              </span>
+              <strong className="tabular-nums" style={{ color: "var(--text-primary)" }}>
+                {pregnancy.eddDate.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </strong>
+              {eddEth?.formatted_am && (
+                <span style={{ color: "var(--text-secondary)", fontSize: "0.8125rem" }}>
+                  {" "}
+                  &bull; {eddEth.formatted_am}
+                </span>
+              )}
+            </div>
+          )}
+          {nextAppointment && (
+            <div>
+              <span style={{ color: "var(--text-muted)", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", display: "block" }}>
+                Next appointment
+              </span>
+              <strong style={{ color: "var(--text-primary)" }}>
+                {nextAppointment.kind.toUpperCase()}
+              </strong>{" "}
+              <span className="tabular-nums" style={{ color: "var(--text-secondary)" }}>
+                &bull;{" "}
+                {nextAppointment.scheduledFor.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
               </span>
             </div>
-            <div
-              className={`step-item ${
-                gaInfo && gaInfo.trimester === 3 && participant.status === "active_pregnant"
-                  ? "active"
-                  : ["postnatal", "completed"].includes(participant.status)
-                  ? "completed"
-                  : ""
-              }`}
-            >
-              <span className="step-dot">3</span>
-              <span className="step-label">
-                3rd Trimester
-                <br />
-                <small className="text-muted">(28–40 wks)</small>
-              </span>
-            </div>
-            <div
-              className={`step-item ${
-                participant.status === "postnatal"
-                  ? "active"
-                  : participant.status === "completed"
-                  ? "completed"
-                  : ""
-              }`}
-            >
-              <span className="step-dot">
-                <i className="bi bi-heart-pulse-fill"></i>
-              </span>
-              <span className="step-label">
-                Postnatal Care
-                <br />
-                <small className="text-muted">(Day 1–42)</small>
-              </span>
-            </div>
-            <div
-              className={`step-item ${participant.status === "completed" ? "completed" : ""}`}
-            >
-              <span className="step-dot">
-                <i className="bi bi-check-lg"></i>
-              </span>
-              <span className="step-label">
-                Graduated
-                <br />
-                <small className="text-muted">(6 Weeks)</small>
-              </span>
-            </div>
+          )}
+          <div>
+            <span style={{ color: "var(--text-muted)", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", display: "block" }}>
+              Facility &amp; kebele
+            </span>
+            <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>
+              {participant.facility.name} &bull; {formatKebele(participant.kebele)}
+            </span>
+          </div>
+          <div>
+            <span style={{ color: "var(--text-muted)", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", display: "block" }}>
+              Phone &amp; language
+            </span>
+            <span className="tabular-nums" style={{ color: "var(--text-primary)", fontWeight: 500 }}>
+              {primaryPhone ? primaryPhone.numberE164 : "No phone"} &bull;{" "}
+              {participant.preferredLanguage === "am"
+                ? "Amharic"
+                : participant.preferredLanguage === "gurage"
+                ? "Gurage"
+                : "English"}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Grid: Clinical Obstetric Card + Contact Card */}
-      <div className="row g-4 mb-4">
-        {/* Clinical Obstetric Card */}
-        <div className="col-lg-7">
-          <div className="card-custom p-4 h-100">
-            <h5 className="fw-bold mb-3 d-flex align-items-center gap-2">
-              <i className="bi bi-clipboard2-pulse"></i>
-              <span>Obstetric &amp; gestational profile</span>
-            </h5>
-
-            {pregnancy ? (
-              <div className="row g-3">
-                <div className="col-sm-6">
-                  <div className="p-3 rounded border bg-light">
-                    <span className="small fw-medium" style={{ color: "var(--text-secondary)" }}>
-                      Estimated due date (GC)
-                    </span>
-                    <div className="fs-4 fw-bold mt-1 tabular-nums">
-                      {pregnancy.eddDate
-                        ? pregnancy.eddDate.toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })
-                        : "—"}
-                    </div>
-                    <small style={{ color: "var(--text-muted)" }}>
-                      Calculated via Naegele&apos;s rule (LMP + 280d)
-                    </small>
-                  </div>
-                </div>
-
-                <div className="col-sm-6">
-                  <div className="p-3 rounded border bg-light">
-                    <span className="small fw-medium" style={{ color: "var(--text-secondary)" }}>
-                      EDD in Ethiopian calendar (ዓ.ም)
-                    </span>
-                    <div className="fs-4 fw-bold mt-1 tabular-nums">
-                      {eddEth?.formatted_am || "—"}
-                    </div>
-                    <small style={{ color: "var(--text-muted)" }}>
-                      ({eddEth?.formatted_en || "—"})
-                    </small>
-                  </div>
-                </div>
-
-                <div className="col-sm-6">
-                  <div className="p-3 rounded border bg-light">
-                    <span className="small fw-medium" style={{ color: "var(--text-secondary)" }}>
-                      Gestational age status
-                    </span>
-                    {gaInfo ? (
-                      <>
-                        <div className="fs-5 fw-bold mt-1 tabular-nums">{gaInfo.formatted}</div>
-                        <span className="badge-clinical pregnant mt-1">
-                          Trimester {gaInfo.trimester} active
-                        </span>
-                      </>
-                    ) : (
-                      <div className="text-muted mt-1">—</div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="col-sm-6">
-                  <div className="p-3 rounded border bg-light">
-                    <span className="text-secondary small fw-medium">Clinical Risk Assessment</span>
-                    <div className="fs-5 fw-bold text-slate-900 mt-1 text-capitalize">
-                      {pregnancy.riskStatus || "Standard"} Risk
-                    </div>
-                    <small className="text-muted">
-                      Dating Method: {(pregnancy.datingMethod || "lmp").toUpperCase()}
-                    </small>
-                  </div>
-                </div>
-
-                {pregnancy.deliveredAt && (
-                  <div className="col-12">
-                    <div className="p-3 rounded border border-success-subtle bg-success-subtle bg-opacity-25">
-                      <div className="d-flex align-items-center gap-2 text-success fw-bold">
-                        <i className="bi bi-gift-fill fs-5"></i> Delivery Event Confirmed
-                      </div>
-                      <div className="mt-1 text-dark small">
-                        Delivered on{" "}
-                        <strong>
-                          {pregnancy.deliveredAt.toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })}
-                        </strong>{" "}
-                        at <strong>{pregnancy.deliveryPlace || "Facility"}</strong>.
-                      </div>
-                      {pregnancy.babies.map((baby) => (
-                        <div key={baby.id} className="badge bg-success text-white mt-2 px-3 py-1 me-2">
-                          <i className="bi bi-person-heart me-1"></i> {baby.name || "Baby"} (
-                          {baby.babyCode})
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+      {/* Longitudinal 13-Stage Care Continuum (8 ANC + EDD + 4 PNC) */}
+      <div className="card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
+        <div className="care-continuum-panel" style={{ borderBottom: "none", paddingBottom: 0, marginBottom: 0 }}>
+          <div className="continuum-header">
+            <div>
+              <div className="continuum-title">
+                <svg className="icon-svg sm" style={{ color: "var(--text-secondary)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                </svg>
+                <span>Longitudinal care continuum</span>
               </div>
-            ) : (
-              <div className="text-muted small">No active pregnancy registered.</div>
-            )}
+              <div className="continuum-sub">
+                WHO integrated continuum: 8 antenatal contacts, institutional delivery, and 4 postnatal checks.
+              </div>
+            </div>
+            <div className="continuum-pills">
+              <span className={`badge ${delivered ? "badge-success" : "badge-info"}`}>
+                {delivered ? "Postpartum phase" : "Antepartum phase"}
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/* Contact & Message Configuration Card */}
-        <div className="col-lg-5">
-          <div className="card-custom p-4 h-100">
-            <h5 className="fw-bold mb-3 d-flex align-items-center gap-2 text-dark">
-              <i
-                className="bi bi-telephone text-teal"
-                style={{ color: "var(--app-primary)" }}
-              ></i>
-              <span>Contact & Automated Delivery</span>
-            </h5>
+          {/* Phase Headers */}
+          <div className="stepper-phases-header">
+            <div className="stepper-phase-group phase-anc">
+              <span className="stepper-phase-title">Antenatal contacts</span>
+              <span className="stepper-phase-bracket" />
+            </div>
+            <div className="stepper-phase-group phase-delivery">
+              <span className="stepper-phase-title">Delivery</span>
+              <span className="stepper-phase-bracket" />
+            </div>
+            <div className="stepper-phase-group phase-pnc">
+              <span className="stepper-phase-title">Postnatal</span>
+              <span className="stepper-phase-bracket" />
+            </div>
+          </div>
 
-            <ul className="list-unstyled mb-0">
-              <li className="p-3 rounded border bg-light mb-3">
-                <span className="text-secondary small fw-medium">Delivery Phone Number</span>
-                <div className="fs-5 fw-bold text-slate-900 mt-1">
-                  {primaryPhone ? primaryPhone.numberE164 : "No phone recorded"}
+          {/* 13-Stage Stepper Track */}
+          <div className="continuum-stepper-track">
+            {ancNodes.map((node, i) => {
+              const attended = delivered || currentGaWeeks > node.week;
+              const isCurrent = !delivered && currentGaWeeks >= node.week - 2 && currentGaWeeks <= node.week;
+              return (
+                <div key={node.label} className="c-step-item">
+                  {isCurrent && <span className="c-step-next-badge">Current</span>}
+                  <div
+                    className={`c-step-node ${
+                      attended ? "is-attended" : isCurrent ? "is-next" : "is-upcoming"
+                    }`}
+                  >
+                    {attended ? "✓" : i + 1}
+                  </div>
+                  <span className="c-step-label tabular-nums">{node.label}</span>
                 </div>
-                <div className="d-flex gap-2 mt-2">
-                  <span className="badge bg-white text-dark border small text-capitalize">
-                    Device Owner: {primaryPhone?.ownerType || "Unknown"}
-                  </span>
-                  <span className="badge bg-white text-success border small">
-                    <i className="bi bi-shield-check"></i> Non-diagnostic SMS
-                  </span>
-                </div>
-              </li>
+              );
+            })}
 
-              <li className="p-3 rounded border bg-light mb-3">
-                <span className="text-secondary small fw-medium">Language & Message Tone</span>
-                <div className="fw-bold text-dark mt-1">
-                  {participant.preferredLanguage === "am"
-                    ? "Amharic (አማርኛ)"
-                    : participant.preferredLanguage === "gurage"
-                    ? "Gurage"
-                    : "English"}
-                </div>
-                <div className="text-muted small mt-1">
-                  Tone:{" "}
-                  {participant.studyArm === "intervention_gain"
-                    ? "Gain-framed (Encouraging benefits)"
-                    : "Loss-framed (Risk awareness)"}
-                </div>
-              </li>
+            <div className="c-step-item is-milestone">
+              <div className={`c-step-node is-edd-milestone ${delivered ? "is-delivered" : ""}`}>
+                {delivered ? "✓" : "EDD"}
+              </div>
+              <span className="c-step-label">{delivered ? "Birth" : "EDD"}</span>
+            </div>
 
-              <li className="p-3 rounded border bg-light">
-                <span className="text-secondary small fw-medium">Assigned Health Facility</span>
-                <div className="fw-bold text-dark mt-1">{participant.facility.name}</div>
-                <small className="text-secondary">
-                  {participant.facility.woreda}, {participant.facility.zone} Zone
-                </small>
-              </li>
-            </ul>
+            {pncNodes.map((node, i) => {
+              const pncDays = pregnancy?.deliveredAt
+                ? Math.floor((Date.now() - pregnancy.deliveredAt.getTime()) / (1000 * 3600 * 24))
+                : -1;
+              const attended = delivered && pncDays >= node.day;
+              return (
+                <div key={node.label} className="c-step-item">
+                  <div className={`c-step-node ${attended ? "is-attended" : "is-upcoming"}`}>
+                    {attended ? "✓" : i + 1}
+                  </div>
+                  <span className="c-step-label tabular-nums">{node.label}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      {/* Tables: Checkups & Dispatched SMS History */}
-      <div className="card-custom overflow-hidden mb-4">
-        <div className="card-header-clean bg-light">
-          <div className="d-flex align-items-center gap-2">
-            <i className="bi bi-calendar-check text-teal" style={{ color: "var(--app-primary)" }}></i>
-            <span className="fw-bold text-dark">Checkups & Visits ({participant.appointments.length})</span>
-          </div>
+      {/* Appointments & Checkups Card */}
+      <div className="card" style={{ padding: 0, overflow: "hidden", marginBottom: "1.5rem" }}>
+        <div className="card-header" style={{ padding: "1rem 1.25rem", marginBottom: 0 }}>
+          <h2 className="card-title tabular-nums">
+            Checkups &amp; visits ({participant.appointments.length})
+          </h2>
         </div>
-
         <div className="table-responsive">
-          <table className="table table-custom">
+          <table className="data-table">
             <thead>
               <tr>
-                <th>Visit Type</th>
-                <th>Scheduled Date</th>
+                <th>Visit type</th>
+                <th>Scheduled date</th>
                 <th>Status</th>
-                <th>Recorded By</th>
+                <th>Recorded by</th>
                 <th>Notes</th>
               </tr>
             </thead>
             <tbody>
-              {participant.appointments.map((apt) => (
-                <tr key={apt.id}>
-                  <td>
-                    <span className="badge bg-light text-dark border">{apt.kind.toUpperCase()}</span>
-                  </td>
-                  <td className="fw-bold text-slate-900">
-                    {apt.scheduledFor.toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </td>
-                  <td>
-                    {apt.status === "attended" && (
-                      <span className="badge-clinical postnatal">
-                        <i className="bi bi-check2"></i> Attended
-                      </span>
-                    )}
-                    {apt.status === "missed" && (
-                      <span className="badge-clinical missed">
-                        <i className="bi bi-exclamation-triangle"></i> Missed
-                      </span>
-                    )}
-                    {apt.status === "rescheduled" && (
-                      <span className="badge-clinical opted-out">
-                        <i className="bi bi-arrow-repeat"></i> Rescheduled
-                      </span>
-                    )}
-                    {apt.status === "scheduled" && (
-                      <span className="badge-clinical pregnant">
-                        <i className="bi bi-clock"></i> Scheduled
-                      </span>
-                    )}
-                  </td>
-                  <td className="text-secondary small">{apt.recordedBy || "System"}</td>
-                  <td className="text-secondary small">{apt.notes || "Routine Checkup"}</td>
-                </tr>
-              ))}
-              {participant.appointments.length === 0 && (
+              {participant.appointments.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center text-muted py-4">
+                  <td colSpan={5} style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>
                     No visits scheduled yet.
                   </td>
                 </tr>
+              ) : (
+                participant.appointments.map((apt) => (
+                  <tr key={apt.id}>
+                    <td>
+                      <span className="badge badge-info">{apt.kind.toUpperCase()}</span>
+                    </td>
+                    <td className="tabular-nums" style={{ fontWeight: 600 }}>
+                      {apt.scheduledFor.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </td>
+                    <td>
+                      {apt.status === "attended" && <span className="badge badge-success">Attended</span>}
+                      {apt.status === "missed" && <span className="badge badge-urgent">Missed</span>}
+                      {apt.status === "scheduled" && <span className="badge badge-neutral">Scheduled</span>}
+                      {apt.status === "rescheduled" && <span className="badge badge-warning">Rescheduled</span>}
+                    </td>
+                    <td style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
+                      {apt.recordedBy || "System"}
+                    </td>
+                    <td style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
+                      {apt.notes || "—"}
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Dispatched SMS History */}
-      <div className="card-custom overflow-hidden mb-4">
-        <div className="card-header-clean bg-light">
-          <div className="d-flex align-items-center gap-2">
-            <i className="bi bi-chat-left-text text-teal" style={{ color: "var(--app-primary)" }}></i>
-            <span className="fw-bold text-dark">
-              Dispatched SMS Log ({participant.outboxMessages.length})
-            </span>
-          </div>
+      {/* Outbox SMS History Card */}
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <div className="card-header" style={{ padding: "1rem 1.25rem", marginBottom: 0 }}>
+          <h2 className="card-title tabular-nums">
+            Scheduled SMS dispatches ({participant.outboxMessages.length})
+          </h2>
         </div>
-
         <div className="table-responsive">
-          <table className="table table-custom">
+          <table className="data-table">
             <thead>
               <tr>
-                <th>SMS Content</th>
+                <th>Scheduled</th>
+                <th>Message body</th>
                 <th>Segments</th>
                 <th>Status</th>
-                <th>Sent Time</th>
               </tr>
             </thead>
             <tbody>
-              {participant.outboxMessages.map((msg) => (
-                <tr key={msg.id}>
-                  <td style={{ maxWidth: 480 }}>
-                    <div className="small text-dark">{msg.messageContent}</div>
-                  </td>
-                  <td>
-                    <span className="badge bg-light text-dark border small">
-                      {msg.segments} seg
-                    </span>
-                  </td>
-                  <td>
-                    {["sent", "delivered", "submitted"].includes(msg.status) && (
-                      <span className="badge-clinical postnatal">
-                        <i className="bi bi-check2"></i> Delivered
-                      </span>
-                    )}
-                    {msg.status === "pending" && (
-                      <span className="badge-clinical opted-out">Queued</span>
-                    )}
-                    {msg.status === "cancelled" && (
-                      <span className="badge-clinical completed">Cancelled</span>
-                    )}
-                    {msg.status === "failed" && (
-                      <span className="badge-clinical missed">Failed</span>
-                    )}
-                  </td>
-                  <td className="text-secondary small">
-                    {(msg.sentAt || msg.scheduledAt).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </td>
-                </tr>
-              ))}
-              {participant.outboxMessages.length === 0 && (
+              {participant.outboxMessages.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="text-center text-muted py-4">
-                    No automated messages dispatched yet.
+                  <td colSpan={4} style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>
+                    No SMS dispatches queued for this participant.
                   </td>
                 </tr>
+              ) : (
+                participant.outboxMessages.map((msg) => (
+                  <tr key={msg.id}>
+                    <td className="tabular-nums" style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                      {new Date(msg.scheduledAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </td>
+                    <td style={{ fontSize: "0.875rem", color: "var(--text-primary)", maxWidth: "460px" }}>
+                      {msg.messageContent}
+                    </td>
+                    <td>
+                      <span className="badge badge-neutral tabular-nums">{msg.segments} seg</span>
+                    </td>
+                    <td>
+                      {["sent", "delivered", "submitted"].includes(msg.status) && (
+                        <span className="badge badge-success">Delivered</span>
+                      )}
+                      {msg.status === "pending" && <span className="badge badge-info">Queued</span>}
+                      {msg.status === "failed" && <span className="badge badge-urgent">Failed</span>}
+                      {msg.status === "cancelled" && <span className="badge badge-neutral">Cancelled</span>}
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
       </div>
-    </>
+    </div>
   );
 }
