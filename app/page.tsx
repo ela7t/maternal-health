@@ -202,47 +202,50 @@ export default async function TodayPage() {
       </div>
 
       {/* SECTION 1: Missed Visits (Collapsed slim 44px strip when 0) */}
-      <section id="sec-missed-visits" style={{ marginBottom: "1rem" }}>
+      <section id="sec-missed-visits" className="priority-section">
         {missedCount === 0 ? (
-          <div className="zero-state-strip">
-            <div className="zero-state-left">
-              <svg className="zero-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <div className="zero-section-collapsed">
+            <div className="zero-section-left">
+              <svg className="icon-svg sm" width="18" height="18" style={{ color: "var(--status-success-accent)", flexShrink: 0 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              <span className="zero-title">Missed visits</span>
-              <span className="zero-sub">All scheduled appointments attended on time</span>
+              <span className="zero-section-title">Missed visits</span>
+              <span style={{ color: "var(--text-muted)" }}>All scheduled appointments attended on time</span>
             </div>
-            <span className="zero-count-pill tabular-nums">0</span>
+            <span className="zero-section-pill tabular-nums">0</span>
           </div>
         ) : (
-          <div className="priority-section urgent">
-            <div className="section-header-bar">
-              <div className="section-title-group">
-                <svg className="icon-svg sm" style={{ color: "var(--status-urgent-accent)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <div>
+            <div className="section-header-row">
+              <div className="section-title-wrap">
+                <svg className="icon-svg sm" width="18" height="18" style={{ color: "var(--status-urgent-accent)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <circle cx="12" cy="12" r="10" />
                   <line x1="12" y1="8" x2="12" y2="12" />
                   <line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
-                <h2>Missed visits requiring follow-up</h2>
+                <span>Missed visits requiring follow-up</span>
+                <span className="section-count-badge tabular-nums">{missedCount}</span>
               </div>
-              <span className="badge badge-urgent tabular-nums">{missedCount}</span>
             </div>
-            <div className="priority-list">
+            <div className="priority-cards-list">
               {missedAppointments.map((apt) => {
                 const ph = apt.participant.phones[0];
                 return (
-                  <div key={apt.id} className="priority-row">
-                    <div className="row-main-info">
-                      <div className="row-title-line">
-                        <Link href={`/participants/${apt.participant.id}`} className="row-patient-name">
+                  <div key={apt.id} className="priority-row-card" style={{ borderLeft: "3px solid var(--status-urgent-accent)" }}>
+                    <div className="priority-left">
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "6px" }}>
+                        <Link
+                          href={`/participants/${apt.participant.id}`}
+                          style={{ fontWeight: 700, fontSize: "1rem", color: "var(--text-primary)", textDecoration: "none" }}
+                        >
                           {apt.participant.fullName}
                         </Link>
-                        <span className="mrn-badge">{apt.participant.publicCode}</span>
+                        <span className="mrn-badge tabular-nums">{apt.participant.publicCode}</span>
                         <span className="badge badge-urgent">
                           {apt.kind === "anc" ? "ANC Missed" : "PNC Missed"}
                         </span>
                       </div>
-                      <div className="row-meta-line">
+                      <div className="patient-meta-line" style={{ display: "flex", gap: "8px", flexWrap: "wrap", color: "var(--text-secondary)", fontSize: "0.8125rem" }}>
                         <span>{formatKebele(apt.participant.kebele)}</span>
                         <span>&bull;</span>
                         <span>{apt.participant.facility.name}</span>
@@ -262,9 +265,9 @@ export default async function TodayPage() {
                         )}
                       </div>
                     </div>
-                    <div className="row-actions">
+                    <div className="priority-right" style={{ flexShrink: 0 }}>
                       <Link
-                        href={`/appointments?filter=missed`}
+                        href="/appointments?filter=missed"
                         className="btn btn-primary"
                         style={{ minHeight: "44px" }}
                       >
@@ -280,56 +283,55 @@ export default async function TodayPage() {
       </section>
 
       {/* SECTION 2: Phone Problems (Collapsed slim 44px strip when 0) */}
-      <section id="sec-phone-problems" style={{ marginBottom: "1.5rem" }}>
+      <section id="sec-phone-problems" className="priority-section">
         {failedSmsCount === 0 ? (
-          <div className="zero-state-strip">
-            <div className="zero-state-left">
-              <svg className="zero-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <div className="zero-section-collapsed">
+            <div className="zero-section-left">
+              <svg className="icon-svg sm" width="18" height="18" style={{ color: "var(--status-success-accent)", flexShrink: 0 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              <span className="zero-title">Phone problems</span>
-              <span className="zero-sub">All participant phone numbers reachable</span>
+              <span className="zero-section-title">Phone problems</span>
+              <span style={{ color: "var(--text-muted)" }}>All participant phone numbers reachable</span>
             </div>
-            <span className="zero-count-pill tabular-nums">0</span>
+            <span className="zero-section-pill tabular-nums">0</span>
           </div>
         ) : (
-          <div className="priority-section urgent">
-            <div className="section-header-bar">
-              <div className="section-title-group">
-                <h2>Phone problems</h2>
-              </div>
-              <Link href="/outbox?status=failed" className="btn btn-primary" style={{ minHeight: "44px" }}>
-                Inspect {failedSmsCount} failed SMS
-              </Link>
+          <div className="section-header-row">
+            <div className="section-title-wrap">
+              <span>Phone problems</span>
+              <span className="section-count-badge tabular-nums">{failedSmsCount}</span>
             </div>
+            <Link href="/outbox?status=failed" className="btn btn-primary" style={{ minHeight: "44px" }}>
+              Inspect {failedSmsCount} failed SMS
+            </Link>
           </div>
         )}
       </section>
 
       {/* SECTION 3: Visits This Week (With Gestational Week 12-42 Tracker) */}
       <section id="sec-visits-due" className="priority-section">
-        <div className="section-header-bar">
-          <div className="section-title-group">
-            <svg className="icon-svg sm" style={{ color: "var(--text-secondary)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <div className="section-header-row">
+          <div className="section-title-wrap">
+            <svg className="icon-svg sm" width="18" height="18" style={{ color: "var(--text-secondary)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
               <line x1="16" y1="2" x2="16" y2="6" />
               <line x1="8" y1="2" x2="8" y2="6" />
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
-            <h2>Visits this week</h2>
+            <span>Visits this week</span>
+            <span className="section-count-badge tabular-nums">{visitsDueCount}</span>
           </div>
-          <span className="badge badge-neutral tabular-nums">{visitsDueCount}</span>
         </div>
 
         {visitsDueCount === 0 ? (
-          <div style={{ padding: "2rem 1.5rem", textAlign: "center", color: "var(--text-muted)" }}>
+          <div className="card" style={{ padding: "1.5rem", textAlign: "center", color: "var(--text-secondary)" }}>
             No clinic visits scheduled in the next 7 days.{" "}
             <Link href="/appointments" style={{ color: "var(--text-primary)", fontWeight: 600 }}>
               View all scheduled visits
             </Link>
           </div>
         ) : (
-          <div className="priority-list">
+          <div className="priority-cards-list">
             {visitsThisWeek.map((apt) => {
               const preg = apt.participant.pregnancies[0];
               const gaInfo = preg?.eddDate ? calculateGestationalAge(preg.eddDate) : null;
@@ -337,116 +339,119 @@ export default async function TodayPage() {
               const pct = gaWeeks !== null ? ((gaWeeks - 12) / 30) * 100 : null;
 
               return (
-                <div key={apt.id} className="priority-row" style={{ flexDirection: "column", alignItems: "stretch", gap: "0.75rem" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem" }}>
-                    <div className="row-main-info">
-                      <div className="row-title-line">
-                        <Link href={`/participants/${apt.participant.id}`} className="row-patient-name">
-                          {apt.participant.fullName}
-                        </Link>
-                        <span className="mrn-badge">{apt.participant.publicCode}</span>
-                        <span className={`badge ${apt.kind === "anc" ? "badge-info" : "badge-success"}`}>
-                          {apt.kind === "anc" ? "ANC Visit" : "PNC Visit"}
-                        </span>
-                        {gaInfo && (
-                          <span className="badge badge-neutral tabular-nums">
-                            {gaInfo.formatted}
-                          </span>
-                        )}
-                      </div>
-                      <div className="row-meta-line">
-                        <span>{formatKebele(apt.participant.kebele)}</span>
-                        <span>&bull;</span>
-                        <span>{apt.participant.facility.name}</span>
-                        <span>&bull;</span>
-                        <span className="tabular-nums">
-                          {apt.scheduledFor.toLocaleDateString("en-US", {
-                            weekday: "short",
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="row-actions">
+                <div key={apt.id} className="priority-row-card" style={{ flexWrap: "wrap" }}>
+                  <div className="priority-left">
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "6px" }}>
                       <Link
                         href={`/participants/${apt.participant.id}`}
-                        className="btn btn-primary"
-                        style={{ minHeight: "44px" }}
+                        style={{ fontWeight: 700, fontSize: "1rem", color: "var(--text-primary)", textDecoration: "none" }}
                       >
-                        Record visit
+                        {apt.participant.fullName}
                       </Link>
+                      <span className="mrn-badge tabular-nums">{apt.participant.publicCode}</span>
+                      <span className={`badge ${apt.kind === "anc" ? "badge-info" : "badge-success"}`}>
+                        {apt.kind === "anc" ? "ANC Visit" : "PNC Visit"}
+                      </span>
+                      {gaInfo && (
+                        <span className="badge badge-neutral tabular-nums">
+                          {gaInfo.formatted}
+                        </span>
+                      )}
+                    </div>
+                    <div className="patient-meta-line" style={{ display: "flex", gap: "8px", flexWrap: "wrap", color: "var(--text-secondary)", fontSize: "0.8125rem" }}>
+                      <span>{formatKebele(apt.participant.kebele)}</span>
+                      <span>&bull;</span>
+                      <span>{apt.participant.facility.name}</span>
+                      <span>&bull;</span>
+                      <span className="tabular-nums">
+                        {apt.scheduledFor.toLocaleDateString("en-US", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Gestational Week 12-42 Tracker (Exact clinical.css classes) */}
+                  {/* Gestational Week 12-42 Tracker */}
                   {gaWeeks !== null && pct !== null && (
-                    <div className="gestational-tracker" role="region" aria-label={`Gestational week tracker: Week ${gaInfo?.weeks}`}>
-                      <div className="gt-desktop-track">
-                        <div className="gt-track-wrapper">
-                          <div className="gt-axis-labels">
-                            <span className="gt-axis-label">12w</span>
-                            <span className="gt-axis-label">20w</span>
-                            <span className="gt-axis-label">28w</span>
-                            <span className="gt-axis-label">36w</span>
-                            <span className="gt-axis-label">42w</span>
-                          </div>
-                          <div className="gt-bar-track">
-                            {[0, 13.3, 26.7, 46.7, 60, 73.3, 80, 86.7, 100].map((leftPct) => (
-                              <div key={leftPct} className="gt-tick" style={{ left: `${leftPct}%` }} />
-                            ))}
-                            <div
-                              className="gt-bar-fill"
-                              style={{ width: `clamp(4%, ${pct}%, 100%)` }}
-                            />
-                            {ancWeeks.map((wk, idx) => {
-                              const tickPct = ((wk - 12) / 30) * 100;
-                              const isPast = wk <= gaWeeks;
-                              return (
-                                <div
-                                  key={wk}
-                                  className={`gt-node-marker ${isPast ? "attended" : "upcoming"}`}
-                                  style={{ left: `${tickPct}%` }}
-                                  title={`ANC ${idx + 1}: ${wk}w`}
-                                >
-                                  {isPast ? (
-                                    <svg className="gt-node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                      <polyline points="20 6 9 17 4 12" />
-                                    </svg>
-                                  ) : (
-                                    <span className="gt-node-idx">{idx + 1}</span>
-                                  )}
-                                </div>
-                              );
-                            })}
-                            <div className="gt-current-pin" style={{ left: `clamp(6%, ${pct}%, 94%)` }}>
-                              <span className="gt-pin-badge tabular-nums">Week {gaInfo?.weeks}</span>
+                    <div className="priority-center gestational-tracker-col">
+                      <div className="gestational-tracker" role="region" aria-label={`Gestational week tracker: Week ${gaInfo?.weeks}`}>
+                        <div className="gt-desktop-track">
+                          <div className="gt-track-wrapper">
+                            <div className="gt-axis-labels">
+                              <span className="gt-axis-label">12w</span>
+                              <span className="gt-axis-label">20w</span>
+                              <span className="gt-axis-label">28w</span>
+                              <span className="gt-axis-label">36w</span>
+                              <span className="gt-axis-label">42w</span>
+                            </div>
+                            <div className="gt-bar-track">
+                              {[0, 13.3, 26.7, 46.7, 60, 73.3, 80, 86.7, 100].map((leftPct) => (
+                                <div key={leftPct} className="gt-tick" style={{ left: `${leftPct}%` }} />
+                              ))}
+                              <div
+                                className="gt-bar-fill"
+                                style={{ width: `clamp(4%, ${pct}%, 100%)` }}
+                              />
+                              {ancWeeks.map((wk, idx) => {
+                                const tickPct = ((wk - 12) / 30) * 100;
+                                const isPast = wk <= gaWeeks;
+                                return (
+                                  <div
+                                    key={wk}
+                                    className={`gt-node-marker ${isPast ? "attended" : "upcoming"}`}
+                                    style={{ left: `${tickPct}%` }}
+                                    title={`ANC ${idx + 1}: ${wk}w`}
+                                  >
+                                    {isPast ? (
+                                      <svg className="gt-node-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                        <polyline points="20 6 9 17 4 12" />
+                                      </svg>
+                                    ) : (
+                                      <span className="gt-node-idx">{idx + 1}</span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              <div className="gt-current-pin" style={{ left: `clamp(6%, ${pct}%, 94%)` }}>
+                                <span className="gt-pin-badge tabular-nums">Week {gaInfo?.weeks}</span>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="gt-mobile-view">
-                        <div className="gt-mobile-progress-bar">
-                          <div className="gt-mobile-progress-fill" style={{ width: `clamp(5%, ${pct}%, 100%)` }} />
-                        </div>
-                        <div className="gt-mobile-text-line">
-                          <span className="gt-mobile-ga tabular-nums">
-                            <strong>Week {gaInfo?.weeks}</strong> of 42
-                          </span>
-                          <span className="gt-mobile-divider">&bull;</span>
-                          <span className="gt-mobile-next tabular-nums">
-                            Next:{" "}
-                            {apt.scheduledFor.toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })}
-                          </span>
+                        <div className="gt-mobile-view">
+                          <div className="gt-mobile-progress-bar">
+                            <div className="gt-mobile-progress-fill" style={{ width: `clamp(5%, ${pct}%, 100%)` }} />
+                          </div>
+                          <div className="gt-mobile-text-line">
+                            <span className="gt-mobile-ga tabular-nums">
+                              <strong>Week {gaInfo?.weeks}</strong> of 42
+                            </span>
+                            <span className="gt-mobile-divider">&bull;</span>
+                            <span className="gt-mobile-next tabular-nums">
+                              Next:{" "}
+                              {apt.scheduledFor.toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                              })}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
                   )}
+
+                  <div className="priority-right" style={{ flexShrink: 0 }}>
+                    <Link
+                      href={`/participants/${apt.participant.id}`}
+                      className="btn btn-primary"
+                      style={{ minHeight: "44px" }}
+                    >
+                      Record visit
+                    </Link>
+                  </div>
                 </div>
               );
             })}

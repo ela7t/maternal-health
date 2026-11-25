@@ -3290,3 +3290,19 @@ html[data-theme="dark"] .step-item.active .step-circle {
     max-height: 90vh;
     overflow-y: auto;
 }
+
+/* SVG Icon Size Safety & Directory Header Overlap Guard */
+svg.icon-svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+svg.icon-svg.xs {
+    width: 14px;
+    height: 14px;
+}
+
+.directory-grid-header {
+    position: static !important;
+}

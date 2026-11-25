@@ -159,9 +159,9 @@ export default async function ParticipantsListPage({ searchParams }: Props) {
             const isOverdue = nextApt && nextApt.scheduledFor < now;
 
             return (
-              <div key={p.id} className="directory-row" role="row">
+              <div key={p.id} className="directory-grid-row" role="row">
                 {/* 1. Name / Card */}
-                <div>
+                <div className="directory-cell">
                   <Link
                     href={`/participants/${p.id}`}
                     style={{ fontWeight: 700, color: "var(--text-primary)", textDecoration: "none", display: "block" }}
@@ -174,7 +174,7 @@ export default async function ParticipantsListPage({ searchParams }: Props) {
                 </div>
 
                 {/* 2. GA (Weeks) */}
-                <div className="tabular-nums" style={{ fontSize: "0.875rem" }}>
+                <div className="directory-cell tabular-nums" style={{ fontSize: "0.875rem" }}>
                   {ga ? (
                     <>
                       <span className="badge badge-info" style={{ marginRight: "6px" }}>T{ga.trimester}</span>
@@ -188,7 +188,7 @@ export default async function ParticipantsListPage({ searchParams }: Props) {
                 </div>
 
                 {/* 3. EDD */}
-                <div className="tabular-nums" style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+                <div className="directory-cell tabular-nums" style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
                   {preg?.eddDate
                     ? preg.eddDate.toLocaleDateString("en-US", {
                         month: "short",
@@ -199,7 +199,7 @@ export default async function ParticipantsListPage({ searchParams }: Props) {
                 </div>
 
                 {/* 4. Next Visit Due */}
-                <div className="tabular-nums" style={{ fontSize: "0.875rem" }}>
+                <div className="directory-cell tabular-nums" style={{ fontSize: "0.875rem" }}>
                   {nextApt ? (
                     isOverdue ? (
                       <span className="badge badge-urgent">
@@ -220,7 +220,7 @@ export default async function ParticipantsListPage({ searchParams }: Props) {
                 </div>
 
                 {/* 5. Status (Empty for standard active pregnancy, badge for postnatal/graduated/opted_out/loss) */}
-                <div>
+                <div className="directory-cell">
                   {p.status === "postnatal" && <span className="badge badge-success">Postnatal</span>}
                   {p.status === "completed" && <span className="badge badge-neutral">Graduated</span>}
                   {p.status === "opted_out" && <span className="badge badge-warning">Opted out</span>}
@@ -228,12 +228,12 @@ export default async function ParticipantsListPage({ searchParams }: Props) {
                 </div>
 
                 {/* 6. Kebele */}
-                <div style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+                <div className="directory-cell" style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
                   {formatKebele(p.kebele)}
                 </div>
 
                 {/* 7. Actions (44px View button) */}
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <div className="directory-cell" style={{ display: "flex", justifyContent: "flex-end" }}>
                   <Link href={`/participants/${p.id}`} className="btn btn-outline btn-view-profile">
                     View
                   </Link>
