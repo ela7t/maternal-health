@@ -181,7 +181,20 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { action, deliveryDate, deliveryPlace, babyName, lossReason, customMessage } = body;
+    const {
+      action,
+      deliveryDate,
+      deliveryPlace,
+      babyName,
+      lossReason,
+      customMessage,
+      appointmentId,
+      visitKind,
+      visitDate,
+      notes,
+      phoneNumber,
+      ownerType,
+    } = body;
 
     // 1. Record Delivery
     if (action === "record_delivery") {
@@ -334,9 +347,93 @@ export async function POST(
       });
     }
 
+    // 5. Record Clinical Encounter / Visit
+    if (action === "record_visit") {
+      if (appointmentId) {
+        const apt = await prisma.appointment.update({
+          where: { id: Number(appointmentId) },
+          data: {
+            status: "attended",
+            recordedBy: "admin",
+            notes: notes?.trim() || "Visit recorded by clinician",
+          },
+        });
+        return NextResponse.json({ success: true, appointment: apt });
+      }
+
+      const apt = await prisma.appointment.create({
+        data: {
+          participantId,
+          kind: visitKind === "pnc" ? "pnc" : "anc",
+          scheduledFor: visitDate ? new Date(visitDate) : new Date(),
+          status: "attended",
+          recordedBy: "admin",
+          notes: notes?.trim() || "Visit recorded by clinician",
+        },
+      });
+      return NextResponse.json({ success: true, appointment: apt });
+    }
+
+    // 6. Update Primary Phone Number
+    if (action === "update_phone") {
+      if (!phoneNumber || !phoneNumber.trim()) {
+        return NextResponse.json({ error: "Phone number is required" }, { status: 400 });
+      }
+      const normalized = phoneNumber.trim();
+      const existing = await prisma.participantPhone.findFirst({
+        where: { participantId, isPrimary: true },
+      });
+      if (existing) {
+        await prisma.participantPhone.update({
+          where: { id: existing.id },
+          data: {
+            numberE164: normalized,
+            ownerType: ownerType || existing.ownerType,
+            isReachable: true,
+          },
+        });
+      } else {
+        await prisma.participantPhone.create({
+          data: {
+            participantId,
+            numberE164: normalized,
+            ownerType: ownerType || "self",
+            isPrimary: true,
+            isReachable: true,
+          },
+        });
+      }
+      return NextResponse.json({ success: true });
+    }
+
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (error: any) {
     console.error("POST /api/mothers/[id] error:", error);
     return NextResponse.json({ error: error?.message || "Failed to update participant" }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  props: { params: Promise<{ id: string }> }
+) {
+  return POST(request, props);
+}
+
+export async function DELETE(
+  _request: Request,
+  props: { params: Promise<{ id: string }> }
+) {
+  try {
+    const params = await props.params;
+    const participantId = parseInt(params.id, 10);
+    if (isNaN(participantId)) {
+      return NextResponse.json({ error: "Invalid participant ID" }, { status: 400 });
+    }
+    await prisma.participant.delete({ where: { id: participantId } });
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("DELETE /api/mothers/[id] error:", error);
+    return NextResponse.json({ error: error?.message || "Failed to delete participant" }, { status: 500 });
   }
 }
