@@ -79,7 +79,6 @@ export default async function ParticipantShowPage({ params }: Props) {
         fullName: participant.fullName,
         kebele: formatKebele(participant.kebele),
         preferredLanguage: participant.preferredLanguage,
-        preferredChannel: participant.preferredChannel,
         status: participant.status,
         enrolledAt: participant.enrolledAt.toLocaleDateString("en-US", {
           month: "short",

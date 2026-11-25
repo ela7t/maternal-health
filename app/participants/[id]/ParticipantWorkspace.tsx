@@ -36,7 +36,6 @@ export interface ParticipantWorkspaceProps {
     fullName: string;
     kebele: string;
     preferredLanguage: string;
-    preferredChannel: string;
     status: string;
     enrolledAt: string;
     ageYears: number | null;
