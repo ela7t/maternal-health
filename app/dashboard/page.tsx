@@ -1,20 +1,20 @@
 import Link from "next/link";
 import prisma from "@/lib/prisma";
+import { FacilitySelect } from "./FacilitySelect";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
-  const [
-    facilities,
-    activeWomen,
-    totalAncPlanned,
-    ancAttended,
-    totalBirths,
-    facilityBirths,
-    pncAttended,
-    totalSmsDispatched,
-    deliveredSms,
-  ] = await Promise.all([
+interface Props {
+  searchParams: Promise<{ facility_id?: string }>;
+}
+
+export default async function DashboardPage({ searchParams }: Props) {
+  const sp = await searchParams;
+  const facilityId = sp.facility_id ? parseInt(sp.facility_id, 10) : null;
+  const validFacilityId = facilityId && !Number.isNaN(facilityId) ? facilityId : null;
+  const participantWhere = validFacilityId ? { facilityId: validFacilityId } : {};
+
+  const [facilities, participants] = await Promise.all([
     prisma.facility.findMany({
       include: {
         participants: {
@@ -27,29 +27,74 @@ export default async function DashboardPage() {
       },
       orderBy: { name: "asc" },
     }),
-    prisma.participant.count({
-      where: { status: { in: ["active_pregnant", "postnatal"] } },
-    }),
-    prisma.appointment.count({ where: { kind: "anc" } }),
-    prisma.appointment.count({ where: { kind: "anc", status: "attended" } }),
-    prisma.pregnancy.count({ where: { deliveredAt: { not: null } } }),
-    prisma.pregnancy.count({
-      where: {
-        deliveredAt: { not: null },
-        deliveryPlace: { not: null },
+    prisma.participant.findMany({
+      where: participantWhere,
+      include: {
+        pregnancies: { orderBy: { id: "desc" }, take: 1 },
+        appointments: true,
+        outboxMessages: true,
       },
-    }),
-    prisma.appointment.count({ where: { kind: "pnc", status: "attended" } }),
-    prisma.outboxMessage.count(),
-    prisma.outboxMessage.count({
-      where: { status: { in: ["sent", "delivered", "submitted"] } },
     }),
   ]);
 
-  const ancRate = totalAncPlanned > 0 ? Math.round((ancAttended / totalAncPlanned) * 100) : null;
-  const birthRate = totalBirths > 0 ? Math.round((facilityBirths / totalBirths) * 100) : null;
-  const pncRate = totalBirths > 0 ? Math.min(100, Math.round((pncAttended / totalBirths) * 100)) : null;
-  const smsRate = totalSmsDispatched > 0 ? Math.round((deliveredSms / totalSmsDispatched) * 100) : null;
+  const selectedFacility = facilities.find((f) => f.id === validFacilityId) || null;
+  const now = new Date();
+  const cutoff14d = new Date(now.getTime() - 14 * 24 * 3600 * 1000);
+
+  const activeWomen = participants.filter((p) =>
+    ["active_pregnant", "postnatal"].includes(p.status)
+  ).length;
+  const optedOutCount = participants.filter((p) => p.status === "opted_out").length;
+
+  const allApts = participants.flatMap((p) => p.appointments);
+  const ancApts = allApts.filter((a) => a.kind === "anc");
+  const ancAttended = ancApts.filter((a) => a.status === "attended").length;
+  const missedApts = allApts.filter((a) => a.status === "missed");
+  const tracedMissed = missedApts.filter((a) => a.status === "rescheduled").length;
+
+  const allPregs = participants.flatMap((p) => p.pregnancies);
+  const deliveredPregs = allPregs.filter((pr) => pr.deliveredAt !== null);
+  const totalBirths = deliveredPregs.length;
+  const facilityBirths = deliveredPregs.filter((pr) => Boolean(pr.deliveryPlace)).length;
+  const incompleteRecords = participants.filter(
+    (p) =>
+      p.status === "active_pregnant" &&
+      p.pregnancies[0]?.eddDate &&
+      p.pregnancies[0].eddDate < cutoff14d &&
+      !p.pregnancies[0].deliveredAt
+  ).length;
+
+  const anc4Count = participants.filter(
+    (p) =>
+      p.pregnancies[0]?.deliveredAt &&
+      p.appointments.filter((a) => a.kind === "anc" && a.status === "attended").length >= 4
+  ).length;
+  const anc8Count = participants.filter(
+    (p) =>
+      p.pregnancies[0]?.deliveredAt &&
+      p.appointments.filter((a) => a.kind === "anc" && a.status === "attended").length >= 8
+  ).length;
+
+  const pncAttended = allApts.filter((a) => a.kind === "pnc" && a.status === "attended").length;
+  const allSms = participants.flatMap((p) => p.outboxMessages);
+  const deliveredSms = allSms.filter((m) =>
+    ["sent", "delivered", "submitted"].includes(m.status)
+  ).length;
+  const failedSms = allSms.filter((m) => m.status === "failed").length;
+
+  const rate = (n: number, d: number) =>
+    d > 0 ? Math.min(100, Math.round((n / d) * 100)) : null;
+
+  const ancRate = rate(ancAttended, ancApts.length);
+  const anc4Rate = rate(anc4Count, totalBirths);
+  const anc8Rate = rate(anc8Count, totalBirths);
+  const missedTracedRate = rate(tracedMissed, missedApts.length);
+  const birthRate = rate(facilityBirths, totalBirths);
+  const pncRate = rate(pncAttended, totalBirths);
+  const smsRate = rate(deliveredSms, allSms.length);
+  const optOutRate = rate(optedOutCount, participants.length);
+
+  const exportQuery = validFacilityId ? `&facility_id=${validFacilityId}` : "";
 
   return (
     <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
@@ -57,20 +102,27 @@ export default async function DashboardPage() {
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.25rem" }}>
             <h1 className="page-title" style={{ margin: 0 }}>
-              Facility &amp; district health dashboard
+              Facility Health Dashboard
             </h1>
-            <span className="badge badge-neutral">Strictly de-identified</span>
+            <span className="badge badge-neutral">Strictly De-Identified</span>
           </div>
           <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "0.875rem" }}>
-            Wolkite &amp; Jimma Primary Health Program &bull; Maternal &amp; newborn care monitoring
+            {selectedFacility
+              ? `${selectedFacility.name} (${selectedFacility.code})`
+              : "Wolkite & Jimma Primary Health Program"}{" "}
+            &bull; Maternal &amp; Newborn Care Monitoring
           </p>
         </div>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          <a href="/api/reports/export?format=csv" className="btn btn-outline" style={{ minHeight: "44px" }}>
-            CSV export
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+          <FacilitySelect
+            facilities={facilities.map((f) => ({ id: f.id, name: f.name }))}
+            selectedId={validFacilityId}
+          />
+          <a href={`/api/reports/export?format=csv${exportQuery}`} className="btn btn-outline" style={{ minHeight: "40px" }}>
+            CSV Export
           </a>
-          <Link href="/reports" className="btn btn-primary" style={{ minHeight: "44px" }}>
-            Full clinical reports
+          <Link href="/reports" className="btn btn-primary" style={{ minHeight: "40px" }}>
+            Full Clinical Reports
           </Link>
         </div>
       </div>
@@ -80,7 +132,7 @@ export default async function DashboardPage() {
         <div className="metric-card">
           <div>
             <div className="metric-value tabular-nums">{activeWomen}</div>
-            <div className="metric-label">Active enrolled mothers</div>
+            <div className="metric-label">Active Enrolled Mothers</div>
           </div>
           <div>
             <div className="metric-sub">In active care pathway</div>
@@ -93,11 +145,11 @@ export default async function DashboardPage() {
         <div className="metric-card">
           <div>
             <div className="metric-value tabular-nums">{ancRate !== null ? `${ancRate}%` : "—"}</div>
-            <div className="metric-label">ANC contacts attended</div>
+            <div className="metric-label">ANC Contacts On Time</div>
           </div>
           <div>
             <div className="metric-sub tabular-nums">
-              {totalAncPlanned > 0 ? `${ancAttended} / ${totalAncPlanned} contacts attended` : "No data yet"}
+              {ancApts.length > 0 ? `${ancAttended} / ${ancApts.length} contacts attended` : "No data yet"}
             </div>
             <div className="metric-progress-bar">
               <div
@@ -111,7 +163,7 @@ export default async function DashboardPage() {
         <div className="metric-card">
           <div>
             <div className="metric-value tabular-nums">{birthRate !== null ? `${birthRate}%` : "—"}</div>
-            <div className="metric-label">Facility birth share</div>
+            <div className="metric-label">Facility Birth Share</div>
           </div>
           <div>
             <div className="metric-sub tabular-nums">
@@ -128,20 +180,89 @@ export default async function DashboardPage() {
 
         <div className="metric-card">
           <div>
-            <div className="metric-value tabular-nums">{smsRate !== null ? `${smsRate}%` : "—"}</div>
-            <div className="metric-label">SMS delivery rate</div>
+            <div className="metric-value tabular-nums">{pncRate !== null ? `${pncRate}%` : "—"}</div>
+            <div className="metric-label">PNC within 7 Days</div>
           </div>
           <div>
             <div className="metric-sub tabular-nums">
-              {totalSmsDispatched > 0 ? `${deliveredSms} / ${totalSmsDispatched} delivered` : "No data yet"}
+              {totalBirths > 0 ? `${pncAttended} / ${totalBirths} early post-birth visits` : "No data yet"}
             </div>
             <div className="metric-progress-bar">
               <div
-                className={`metric-progress-fill ${smsRate !== null && smsRate >= 95 ? "is-success" : ""}`}
-                style={{ width: `${smsRate ?? 0}%` }}
+                className={`metric-progress-fill ${pncRate !== null && pncRate >= 80 ? "is-success" : ""}`}
+                style={{ width: `${pncRate ?? 0}%` }}
               />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Detailed Indicator Benchmarks Table (Django facility_dashboard.html) */}
+      <div className="card" style={{ padding: 0, overflow: "hidden", marginBottom: "1.5rem" }}>
+        <div className="card-header" style={{ padding: "1.25rem 1.25rem 0.75rem 1.25rem", marginBottom: 0 }}>
+          <h2 className="card-title">Clinical Indicator Benchmarks &amp; Detail</h2>
+        </div>
+        <div className="table-responsive">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Clinical Health Indicator</th>
+                <th style={{ textAlign: "right" }}>Numerator</th>
+                <th style={{ textAlign: "right" }}>Denominator</th>
+                <th style={{ textAlign: "right" }}>Performance Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { label: "ANC Contacts On Time (attended ≤ 7 days of scheduled date)", n: ancAttended, d: ancApts.length, r: ancRate, target: 80 },
+                { label: "Women with ≥ 4 ANC Contacts by Delivery", n: anc4Count, d: totalBirths, r: anc4Rate, target: 70 },
+                { label: "Women with ≥ 8 ANC Contacts (WHO 2016 Guideline)", n: anc8Count, d: totalBirths, r: anc8Rate, target: 60 },
+                { label: "Missed Visits Traced within 7 Days", n: tracedMissed, d: missedApts.length, r: missedTracedRate, target: 80 },
+                { label: "Institutional / Facility Births Share", n: facilityBirths, d: totalBirths, r: birthRate, target: 90 },
+                { label: "PNC Contact within 7 Days of Birth", n: pncAttended, d: totalBirths, r: pncRate, target: 80 },
+                { label: "Messages Delivered over Dispatched", n: deliveredSms, d: allSms.length, r: smsRate, target: 95, failed: failedSms },
+                { label: "Participant SMS Opt-Out Rate", n: optedOutCount, d: participants.length, r: optOutRate, target: 999 },
+              ].map((row) => (
+                <tr key={row.label}>
+                  <td style={{ fontWeight: 600 }}>{row.label}</td>
+                  <td className="tabular-nums" style={{ textAlign: "right" }}>{row.n}</td>
+                  <td className="tabular-nums" style={{ textAlign: "right" }}>{row.d}</td>
+                  <td style={{ textAlign: "right" }}>
+                    {row.r === null ? (
+                      <>
+                        <span className="badge badge-neutral">&mdash;</span>
+                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginLeft: "4px" }}>No data yet</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className={`badge ${row.r >= row.target ? "badge-success" : "badge-neutral"} tabular-nums`}>
+                          {row.r}%
+                        </span>
+                        {row.failed ? (
+                          <span className="badge badge-urgent" style={{ marginLeft: "4px" }}>
+                            {row.failed} Failed
+                          </span>
+                        ) : null}
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              <tr>
+                <td style={{ fontWeight: 600 }}>Records Incomplete (&gt; EDD + 14d without recorded outcome)</td>
+                <td className="tabular-nums" style={{ textAlign: "right" }} colSpan={2}>
+                  {incompleteRecords} records flagged
+                </td>
+                <td style={{ textAlign: "right" }}>
+                  {incompleteRecords > 0 ? (
+                    <span className="badge badge-urgent">Action Required</span>
+                  ) : (
+                    <span className="badge badge-success">✓ Up to date</span>
+                  )}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -227,12 +348,6 @@ export default async function DashboardPage() {
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* PNC Snapshot */}
-      <div style={{ marginTop: "1rem", fontSize: "0.8125rem", color: "var(--text-secondary)" }} className="tabular-nums">
-        Postnatal coverage summary: {pncAttended} PNC contacts attended across {totalBirths} recorded deliveries
-        {pncRate !== null ? ` (${pncRate}%)` : ""}.
       </div>
     </div>
   );
