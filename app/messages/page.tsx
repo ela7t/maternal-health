@@ -22,12 +22,17 @@ export default async function MessageBankPage() {
             Validated Jimma Zone 78-message repository aligned with the WHO 8-contact ANC model and Ge&apos;ez UCS-2 segment limits.
           </p>
         </div>
-        <span className="badge badge-success" style={{ minHeight: "38px", padding: "0 12px" }}>
-          <svg className="icon-svg sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-          <span>Clinically approved</span>
-        </span>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+          <span className="badge badge-success" style={{ minHeight: "44px", padding: "0 12px" }}>
+            <svg className="icon-svg sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            <span>Clinically approved</span>
+          </span>
+          <a href="/messages/new" className="btn btn-primary" style={{ minHeight: "44px" }}>
+            <span>+ Create template</span>
+          </a>
+        </div>
       </div>
 
       {/* Interactive Amharic Ge'ez Segment Gauge Card */}

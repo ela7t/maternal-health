@@ -3,6 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 import { NavLinks } from "@/components/NavLinks";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 export const metadata: Metadata = {
   title: "Maternal & Newborn Care",
@@ -52,6 +53,7 @@ export default function RootLayout({
             </div>
 
             <div className="header-actions">
+              <LanguageToggle />
               <ThemeToggle />
               <Link href="/participants/new" className="btn-enroll-nav">
                 <svg className="icon-svg sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
