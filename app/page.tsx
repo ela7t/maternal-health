@@ -17,15 +17,33 @@ export default async function TodayPage() {
   const nextWeek = new Date(startOfToday.getTime() + 7 * 24 * 3600 * 1000);
 
   const [
-    activePregnant,
-    activePostnatal,
+    activeCount,
+    missingOutcomes,
     missedAppointments,
     visitsThisWeek,
     failedSmsCount,
-    recentMessages,
   ] = await Promise.all([
-    prisma.participant.count({ where: { status: "active_pregnant" } }),
-    prisma.participant.count({ where: { status: "postnatal" } }),
+    prisma.participant.count({
+      where: { status: { in: ["active_pregnant", "postnatal"] } },
+    }),
+    prisma.pregnancy.findMany({
+      where: {
+        deliveredAt: null,
+        outcome: "ongoing",
+        eddDate: { lt: startOfToday },
+        participant: { status: "active_pregnant" },
+      },
+      include: {
+        participant: {
+          include: {
+            facility: true,
+            phones: { where: { isPrimary: true } },
+          },
+        },
+      },
+      orderBy: { eddDate: "asc" },
+      take: 20,
+    }),
     prisma.appointment.findMany({
       where: {
         OR: [
@@ -63,16 +81,9 @@ export default async function TodayPage() {
       take: 25,
     }),
     prisma.outboxMessage.count({ where: { status: "failed" } }),
-    prisma.outboxMessage.findMany({
-      take: 8,
-      orderBy: { scheduledAt: "desc" },
-      include: {
-        participant: { include: { facility: true } },
-        phone: true,
-      },
-    }),
   ]);
 
+  const missingCount = missingOutcomes.length;
   const missedCount = missedAppointments.length;
   const visitsDueCount = visitsThisWeek.length;
   const formattedToday = now.toLocaleDateString("en-US", {
@@ -86,19 +97,19 @@ export default async function TodayPage() {
 
   return (
     <div className="today-container">
-      {/* Header: Strong Visual Hierarchy (Exact Django today.html) */}
+      {/* Header: Exact Django today.html */}
       <div className="today-header-row">
         <div>
           <h1 className="today-main-title">Today&apos;s priorities</h1>
           <p className="today-subtitle">
             {formattedToday} &bull;{" "}
-            <span className="tabular-nums">{activePregnant + activePostnatal}</span> active mothers
+            <span className="tabular-nums">{activeCount}</span> mothers assigned to you
           </p>
         </div>
         <div style={{ display: "flex", gap: "0.625rem", flexWrap: "wrap", alignItems: "center" }}>
           <SyncSchedulerButton />
           <Link href="/participants/new" className="btn btn-primary btn-enroll-action">
-            <svg className="icon-svg sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg className="icon-svg sm" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -107,22 +118,48 @@ export default async function TodayPage() {
         </div>
       </div>
 
-      {/* 4 Actionable Triage Metric Cards */}
+      {/* 4 Actionable Triage Metric Cards (Exact Django today.html order) */}
       <div className="today-metrics-grid" role="region" aria-label="Triage metric categories">
-        {/* 1. Missed Visits */}
+        {/* 1. Birth outcomes */}
+        <a
+          href="#sec-missing-outcomes"
+          className={`today-metric-card ${missingCount === 0 ? "is-zero" : "has-urgent"}`}
+        >
+          <div className="metric-card-top">
+            <div className="metric-big-num tabular-nums">{missingCount}</div>
+            <svg className="metric-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </div>
+          <div className="metric-title-line">
+            {missingCount > 0 && (
+              <svg className="icon-svg xs alert-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            )}
+            <span>Birth outcomes</span>
+          </div>
+          <div className="metric-subtext">
+            {missingCount > 0 ? "Past EDD, record birth" : "All birth outcomes logged"}
+          </div>
+        </a>
+
+        {/* 2. Missed visits */}
         <a
           href="#sec-missed-visits"
           className={`today-metric-card ${missedCount === 0 ? "is-zero" : "has-urgent"}`}
         >
           <div className="metric-card-top">
             <div className="metric-big-num tabular-nums">{missedCount}</div>
-            <svg className="metric-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="metric-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </div>
           <div className="metric-title-line">
             {missedCount > 0 && (
-              <svg className="icon-svg xs alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <svg className="icon-svg xs alert-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <circle cx="12" cy="12" r="10" />
                 <line x1="12" y1="8" x2="12" y2="12" />
                 <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -135,14 +172,14 @@ export default async function TodayPage() {
           </div>
         </a>
 
-        {/* 2. Visits This Week */}
+        {/* 3. Visits this week */}
         <a
           href="#sec-visits-due"
           className={`today-metric-card ${visitsDueCount === 0 ? "is-zero" : ""}`}
         >
           <div className="metric-card-top">
             <div className="metric-big-num tabular-nums">{visitsDueCount}</div>
-            <svg className="metric-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="metric-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </div>
@@ -155,39 +192,20 @@ export default async function TodayPage() {
           </div>
         </a>
 
-        {/* 3. Active Care */}
-        <Link
-          href="/participants?status=active_pregnant"
-          className={`today-metric-card ${activePregnant === 0 ? "is-zero" : ""}`}
-        >
-          <div className="metric-card-top">
-            <div className="metric-big-num tabular-nums">{activePregnant}</div>
-            <svg className="metric-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </div>
-          <div className="metric-title-line">
-            <span>Active pregnancies</span>
-          </div>
-          <div className="metric-subtext tabular-nums">
-            {activePostnatal} in postnatal care
-          </div>
-        </Link>
-
-        {/* 4. Phone / Gateway Problems */}
-        <Link
-          href={failedSmsCount > 0 ? "/outbox?status=failed" : "/outbox"}
+        {/* 4. Phone problems */}
+        <a
+          href="#sec-phone-problems"
           className={`today-metric-card ${failedSmsCount === 0 ? "is-zero" : "has-urgent"}`}
         >
           <div className="metric-card-top">
             <div className="metric-big-num tabular-nums">{failedSmsCount}</div>
-            <svg className="metric-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="metric-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </div>
           <div className="metric-title-line">
             {failedSmsCount > 0 && (
-              <svg className="icon-svg xs alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <svg className="icon-svg xs alert-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                 <line x1="12" y1="9" x2="12" y2="13" />
                 <line x1="12" y1="17" x2="12.01" y2="17" />
@@ -198,15 +216,85 @@ export default async function TodayPage() {
           <div className="metric-subtext">
             {failedSmsCount > 0 ? "SMS delivery failures" : "All lines reachable"}
           </div>
-        </Link>
+        </a>
       </div>
 
-      {/* SECTION 1: Missed Visits (Collapsed slim 44px strip when 0) */}
+      {/* SECTION 1: Birth outcomes */}
+      <section id="sec-missing-outcomes" className="priority-section">
+        {missingCount === 0 ? (
+          <div className="zero-section-collapsed">
+            <div className="zero-section-left">
+              <svg className="icon-svg sm" width="18" height="18" style={{ color: "var(--status-success-accent)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span className="zero-section-title">Birth outcomes</span>
+              <span style={{ color: "var(--text-muted)" }}>All birth outcomes logged</span>
+            </div>
+            <span className="zero-section-pill tabular-nums">0</span>
+          </div>
+        ) : (
+          <div>
+            <div className="section-header-row">
+              <div className="section-title-wrap">
+                <svg className="icon-svg sm" width="18" height="18" style={{ color: "var(--status-urgent-accent)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <span>Birth outcomes</span>
+                <span className="section-count-badge tabular-nums">{missingCount}</span>
+              </div>
+            </div>
+            <div className="priority-cards-list">
+              {missingOutcomes.map((preg) => {
+                const daysPast = Math.max(1, Math.floor((now.getTime() - preg.eddDate.getTime()) / (1000 * 3600 * 24)));
+                return (
+                  <div key={preg.id} className="priority-row-card" style={{ borderLeft: "3px solid var(--status-urgent-accent)" }}>
+                    <div className="priority-left">
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "6px" }}>
+                        <Link
+                          href={`/participants/${preg.participant.id}`}
+                          style={{ fontWeight: 700, fontSize: "1rem", color: "var(--text-primary)", textDecoration: "none" }}
+                        >
+                          {preg.participant.fullName}
+                        </Link>
+                        <span className="mrn-badge tabular-nums">{preg.participant.publicCode}</span>
+                        <span className="badge badge-urgent tabular-nums">Past EDD ({daysPast}d)</span>
+                      </div>
+                      <div className="patient-meta-line" style={{ display: "flex", gap: "8px", flexWrap: "wrap", color: "var(--text-secondary)", fontSize: "0.8125rem" }}>
+                        <span>{formatKebele(preg.participant.kebele)}</span>
+                        <span>&bull;</span>
+                        <span>{preg.participant.facility.name}</span>
+                        <span>&bull;</span>
+                        <span className="tabular-nums">
+                          EDD{" "}
+                          {preg.eddDate.toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="priority-right" style={{ flexShrink: 0 }}>
+                      <Link href={`/participants/${preg.participant.id}`} className="btn btn-primary" style={{ minHeight: "44px" }}>
+                        Record birth
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* SECTION 2: Missed visits */}
       <section id="sec-missed-visits" className="priority-section">
         {missedCount === 0 ? (
           <div className="zero-section-collapsed">
             <div className="zero-section-left">
-              <svg className="icon-svg sm" width="18" height="18" style={{ color: "var(--status-success-accent)", flexShrink: 0 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <svg className="icon-svg sm" width="18" height="18" style={{ color: "var(--status-success-accent)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
               <span className="zero-section-title">Missed visits</span>
@@ -282,33 +370,7 @@ export default async function TodayPage() {
         )}
       </section>
 
-      {/* SECTION 2: Phone Problems (Collapsed slim 44px strip when 0) */}
-      <section id="sec-phone-problems" className="priority-section">
-        {failedSmsCount === 0 ? (
-          <div className="zero-section-collapsed">
-            <div className="zero-section-left">
-              <svg className="icon-svg sm" width="18" height="18" style={{ color: "var(--status-success-accent)", flexShrink: 0 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <span className="zero-section-title">Phone problems</span>
-              <span style={{ color: "var(--text-muted)" }}>All participant phone numbers reachable</span>
-            </div>
-            <span className="zero-section-pill tabular-nums">0</span>
-          </div>
-        ) : (
-          <div className="section-header-row">
-            <div className="section-title-wrap">
-              <span>Phone problems</span>
-              <span className="section-count-badge tabular-nums">{failedSmsCount}</span>
-            </div>
-            <Link href="/outbox?status=failed" className="btn btn-primary" style={{ minHeight: "44px" }}>
-              Inspect {failedSmsCount} failed SMS
-            </Link>
-          </div>
-        )}
-      </section>
-
-      {/* SECTION 3: Visits This Week (With Gestational Week 12-42 Tracker) */}
+      {/* SECTION 3: Visits this week (With Gestational Week 12-42 Tracker) */}
       <section id="sec-visits-due" className="priority-section">
         <div className="section-header-row">
           <div className="section-title-wrap">
@@ -324,11 +386,15 @@ export default async function TodayPage() {
         </div>
 
         {visitsDueCount === 0 ? (
-          <div className="card" style={{ padding: "1.5rem", textAlign: "center", color: "var(--text-secondary)" }}>
-            No clinic visits scheduled in the next 7 days.{" "}
-            <Link href="/appointments" style={{ color: "var(--text-primary)", fontWeight: 600 }}>
-              View all scheduled visits
-            </Link>
+          <div className="zero-section-collapsed">
+            <div className="zero-section-left">
+              <svg className="icon-svg sm" width="18" height="18" style={{ color: "var(--status-success-accent)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span className="zero-section-title">Visits this week</span>
+              <span style={{ color: "var(--text-muted)" }}>No clinic visits scheduled in the next 7 days</span>
+            </div>
+            <span className="zero-section-pill tabular-nums">0</span>
           </div>
         ) : (
           <div className="priority-cards-list">
@@ -373,7 +439,6 @@ export default async function TodayPage() {
                     </div>
                   </div>
 
-                  {/* Gestational Week 12-42 Tracker */}
                   {gaWeeks !== null && pct !== null && (
                     <div className="priority-center gestational-tracker-col">
                       <div className="gestational-tracker" role="region" aria-label={`Gestational week tracker: Week ${gaInfo?.weeks}`}>
@@ -390,10 +455,7 @@ export default async function TodayPage() {
                               {[0, 13.3, 26.7, 46.7, 60, 73.3, 80, 86.7, 100].map((leftPct) => (
                                 <div key={leftPct} className="gt-tick" style={{ left: `${leftPct}%` }} />
                               ))}
-                              <div
-                                className="gt-bar-fill"
-                                style={{ width: `clamp(4%, ${pct}%, 100%)` }}
-                              />
+                              <div className="gt-bar-fill" style={{ width: `clamp(4%, ${pct}%, 100%)` }} />
                               {ancWeeks.map((wk, idx) => {
                                 const tickPct = ((wk - 12) / 30) * 100;
                                 const isPast = wk <= gaWeeks;
@@ -459,71 +521,30 @@ export default async function TodayPage() {
         )}
       </section>
 
-      {/* Recent SMS Activity */}
-      <section className="card" style={{ marginTop: "1.5rem", padding: 0, overflow: "hidden" }}>
-        <div className="card-header" style={{ padding: "1rem 1.25rem", marginBottom: 0 }}>
-          <h2 className="card-title">Recent automated SMS dispatches</h2>
-          <Link href="/outbox" className="btn btn-outline" style={{ minHeight: "44px" }}>
-            View full SMS log
-          </Link>
-        </div>
-        <div className="table-responsive">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Mother</th>
-                <th>Message</th>
-                <th>Status</th>
-                <th>Scheduled</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentMessages.length === 0 ? (
-                <tr>
-                  <td colSpan={4} style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>
-                    No recent SMS activity.
-                  </td>
-                </tr>
-              ) : (
-                recentMessages.map((msg) => (
-                  <tr key={msg.id}>
-                    <td>
-                      <Link
-                        href={`/participants/${msg.participant.id}`}
-                        style={{ fontWeight: 600, color: "var(--text-primary)", textDecoration: "none" }}
-                      >
-                        {msg.participant.fullName}
-                      </Link>
-                      <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }} className="tabular-nums">
-                        {msg.participant.publicCode}
-                      </div>
-                    </td>
-                    <td style={{ maxWidth: "360px", fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                      {msg.messageContent}
-                    </td>
-                    <td>
-                      {msg.status === "sent" || msg.status === "delivered" || msg.status === "submitted" ? (
-                        <span className="badge badge-success">Delivered</span>
-                      ) : msg.status === "failed" ? (
-                        <span className="badge badge-urgent">Failed</span>
-                      ) : (
-                        <span className="badge badge-info">Queued</span>
-                      )}
-                    </td>
-                    <td className="tabular-nums" style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
-                      {new Date(msg.scheduledAt).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      {/* SECTION 4: Phone problems */}
+      <section id="sec-phone-problems" className="priority-section">
+        {failedSmsCount === 0 ? (
+          <div className="zero-section-collapsed">
+            <div className="zero-section-left">
+              <svg className="icon-svg sm" width="18" height="18" style={{ color: "var(--status-success-accent)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span className="zero-section-title">Phone problems</span>
+              <span style={{ color: "var(--text-muted)" }}>All participant phone numbers reachable</span>
+            </div>
+            <span className="zero-section-pill tabular-nums">0</span>
+          </div>
+        ) : (
+          <div className="section-header-row">
+            <div className="section-title-wrap">
+              <span>Phone problems</span>
+              <span className="section-count-badge tabular-nums">{failedSmsCount}</span>
+            </div>
+            <Link href="/outbox?status=failed" className="btn btn-primary" style={{ minHeight: "44px" }}>
+              Inspect {failedSmsCount} failed SMS
+            </Link>
+          </div>
+        )}
       </section>
     </div>
   );

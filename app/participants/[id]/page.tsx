@@ -253,6 +253,81 @@ export default async function ParticipantShowPage({ params }: Props) {
         </div>
       </div>
 
+      {/* 2. CLINICAL VITALS RIBBON (Exact Django woman_detail.html) */}
+      <div className="card vitals-ribbon" style={{ padding: "1.25rem 1.75rem", marginBottom: "1.5rem" }}>
+        <div className="ribbon-grid">
+          <div className="ribbon-col">
+            <span className="ribbon-label">Gestational age</span>
+            <div className="ribbon-value tabular-nums" style={{ color: "var(--text-primary)" }}>
+              {gaInfo ? gaInfo.formatted : pncInfo ? pncInfo.formatted : "Inactive"}
+            </div>
+            <div className="ribbon-sub">
+              {gaInfo ? `Trimester ${gaInfo.trimester}` : participant.status === "postnatal" ? "Postpartum care" : "Completed"}
+            </div>
+            {gaInfo && (
+              <div className="ribbon-bar">
+                <div className="ribbon-fill" style={{ width: `${Math.min(100, Math.round((gaInfo.weeks / 40) * 100))}%` }} />
+              </div>
+            )}
+          </div>
+
+          <div className="ribbon-col">
+            <span className="ribbon-label">Due date (EDD)</span>
+            <div className="ribbon-value tabular-nums" style={{ color: "var(--text-primary)" }}>
+              {pregnancy?.eddDate
+                ? pregnancy.eddDate.toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                : "—"}
+            </div>
+            <div className="ribbon-sub">
+              <span style={{ color: "var(--text-primary)", fontWeight: 700 }}>{eddEth?.formatted_am || "—"}</span>
+              {eddEth?.formatted_en && (
+                <span style={{ color: "var(--text-muted)", marginLeft: "0.25rem" }}>({eddEth.formatted_en})</span>
+              )}
+            </div>
+          </div>
+
+          <div className="ribbon-col">
+            <span className="ribbon-label">Care continuum (WHO)</span>
+            <div className="ribbon-value tabular-nums" style={{ color: "var(--text-primary)" }}>
+              {participant.appointments.filter((a) => a.status === "attended").length}{" "}
+              <span style={{ fontSize: "0.8125rem", color: "var(--text-muted)", fontWeight: 500 }}>
+                / {Math.max(12, participant.appointments.length)} completed
+              </span>
+            </div>
+            <div className="ribbon-sub tabular-nums">
+              <span>
+                {participant.appointments.filter((a) => a.kind === "anc" && a.status === "attended").length}/8 ANC
+              </span>
+              <span style={{ color: "var(--text-muted)", margin: "0 0.35rem" }}>&bull;</span>
+              <span>
+                {participant.appointments.filter((a) => a.kind === "pnc" && a.status === "attended").length}/4 PNC
+              </span>
+            </div>
+          </div>
+
+          <div className="ribbon-col" style={{ borderRight: "none" }}>
+            <span className="ribbon-label">Contact &amp; telephony</span>
+            <div className="ribbon-value tabular-nums" style={{ color: "var(--text-primary)" }}>
+              {primaryPhone ? primaryPhone.numberE164 : "—"}
+            </div>
+            <div className="ribbon-sub">
+              {participant.preferredLanguage === "am"
+                ? "Amharic (አማርኛ)"
+                : participant.preferredLanguage === "gurage"
+                ? "Gurage"
+                : "English"}
+            </div>
+            <div style={{ fontSize: "0.75rem", color: "var(--status-success-text)", fontWeight: 600, marginTop: "0.375rem" }}>
+              {participant.status === "opted_out" ? "SMS opted out" : "✓ SMS notifications active"}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Longitudinal 13-Stage Care Continuum (8 ANC + EDD + 4 PNC) */}
       <div className="card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
         <div className="care-continuum-panel" style={{ borderBottom: "none", paddingBottom: 0, marginBottom: 0 }}>
