@@ -107,7 +107,7 @@ export default async function ParticipantShowPage({ params }: Props) {
                 year: "numeric",
               }),
               eddEthAm: eddEth ? formatEthiopianDate(eddEth, "am") : "—",
-              eddEthEn: eddEth ? `${formatEthiopianDate(eddEth, "en")} E.C.` : "E.C.",
+              eddEthEn: eddEth ? formatEthiopianDate(eddEth, "en") : "E.C.",
               lmpShort: pregnancy.lmpDate
                 ? pregnancy.lmpDate.toLocaleDateString("en-US", {
                     month: "short",

@@ -686,7 +686,7 @@ export function ParticipantWorkspace({
                 <div className="continuum-stepper-track">
                   {ANC_SCHEDULE.map((node, i) => {
                     const matchedApt = ancVisits[i];
-                    const attended = matchedApt ? matchedApt.status === "attended" : delivered || currentGaWeeks > node.week;
+                    const attended = matchedApt ? matchedApt.status === "attended" : delivered;
                     const isNext = !delivered && nextVisit && matchedApt?.id === nextVisit.id;
                     return (
                       <div key={node.num} className="c-step-item">
