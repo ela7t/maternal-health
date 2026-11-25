@@ -39,6 +39,9 @@ export default async function ParticipantsListPage({ searchParams }: Props) {
   const rows: DirectoryParticipantRow[] = participants.map((p) => {
     const preg = p.pregnancies[0];
     const nextApt = p.appointments[0];
+    const ageYears = p.dateOfBirth
+      ? Math.floor((now.getTime() - p.dateOfBirth.getTime()) / (1000 * 3600 * 24 * 365.25))
+      : null;
     const ga =
       p.status === "active_pregnant" && preg?.eddDate
         ? calculateGestationalAge(preg.eddDate)
@@ -55,6 +58,7 @@ export default async function ParticipantsListPage({ searchParams }: Props) {
       id: p.id,
       fullName: p.fullName,
       publicCode: p.publicCode,
+      ageYears,
       phone: p.phones[0]?.numberE164 || null,
       kebele: formatKebele(p.kebele),
       status: p.status,

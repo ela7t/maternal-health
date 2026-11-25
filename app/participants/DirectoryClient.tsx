@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export interface DirectoryParticipantRow {
   id: number;
   fullName: string;
   publicCode: string;
+  ageYears: number | null;
   phone: string | null;
   kebele: string;
   status: string;
@@ -41,10 +43,29 @@ export function DirectoryClient({
   rows: DirectoryParticipantRow[];
   initialQuery: string;
 }) {
+  const router = useRouter();
   const [search, setSearch] = useState(initialQuery);
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
   const [sortCol, setSortCol] = useState<SortCol>("name");
   const [sortAsc, setSortAsc] = useState(true);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DirectoryParticipantRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/mothers/${deleteTarget.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete record");
+      setDeleteTarget(null);
+      router.refresh();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to delete record");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   const counts = {
     all: rows.length,
@@ -262,15 +283,20 @@ export function DirectoryClient({
           filtered.map((p) => (
             <div key={p.id} className="directory-grid-row" role="row">
               <div className="directory-cell">
-                <Link
-                  href={`/participants/${p.id}`}
-                  style={{ fontWeight: 700, color: "var(--text-primary)", textDecoration: "none", display: "block" }}
-                >
-                  {p.fullName}
-                </Link>
-                <span className="mrn-badge tabular-nums" style={{ marginTop: "4px", display: "inline-block" }}>
-                  {p.publicCode}
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                  <Link
+                    href={`/participants/${p.id}`}
+                    style={{ fontWeight: 700, color: "var(--text-primary)", textDecoration: "none" }}
+                  >
+                    {p.fullName}
+                  </Link>
+                  <span className="mrn-badge tabular-nums">{p.publicCode}</span>
+                </div>
+                {p.ageYears !== null && (
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px" }}>
+                    {p.ageYears} years
+                  </div>
+                )}
               </div>
 
               <div className="directory-cell tabular-nums" style={{ fontSize: "0.875rem" }}>
@@ -318,15 +344,94 @@ export function DirectoryClient({
                 {p.kebele}
               </div>
 
-              <div className="directory-cell" style={{ display: "flex", justifyContent: "flex-end" }}>
+              <div className="directory-cell" style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "6px" }}>
                 <Link href={`/participants/${p.id}`} className="btn btn-outline btn-view-profile">
-                  View
+                  View &rsaquo;
                 </Link>
+                <div className={`dropdown-wrapper ${openMenuId === p.id ? "open" : ""}`}>
+                  <button
+                    type="button"
+                    className="dropdown-trigger"
+                    style={{ minHeight: "40px", minWidth: "40px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                    onClick={() => setOpenMenuId((cur) => (cur === p.id ? null : p.id))}
+                    aria-label="More options"
+                  >
+                    <svg className="icon-svg sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="1" />
+                      <circle cx="19" cy="12" r="1" />
+                      <circle cx="5" cy="12" r="1" />
+                    </svg>
+                  </button>
+                  {openMenuId === p.id && (
+                    <div className="dropdown-menu" style={{ display: "block" }}>
+                      <button
+                        type="button"
+                        className="dropdown-item text-danger"
+                        onClick={() => {
+                          setOpenMenuId(null);
+                          setDeleteTarget(p);
+                        }}
+                      >
+                        <svg className="icon-svg sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                        <span>Delete Record...</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ))
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div
+          className="modal-backdrop"
+          onClick={(e) => e.target === e.currentTarget && setDeleteTarget(null)}
+        >
+          <div className="card modal-content" style={{ maxWidth: "460px", width: "100%", padding: "24px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+              <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "rgba(239, 68, 68, 0.12)", display: "flex", alignItems: "center", justifyContent: "center", color: "#ef4444", flexShrink: 0 }}>
+                <svg className="icon-svg sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+              </div>
+              <h3 style={{ margin: 0, fontSize: "1.125rem", fontWeight: 700, color: "var(--text-primary)" }}>
+                Delete Participant Record
+              </h3>
+            </div>
+            <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", lineHeight: 1.5, margin: "0 0 16px 0" }}>
+              Are you sure you want to permanently delete{" "}
+              <strong style={{ color: "var(--text-primary)" }}>{deleteTarget.fullName}</strong>{" "}
+              (<span style={{ fontFamily: "monospace" }}>{deleteTarget.publicCode}</span>)? All scheduled appointments and SMS dispatches will be removed.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{ minHeight: "44px", padding: "0 16px" }}
+                onClick={() => setDeleteTarget(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ minHeight: "44px", padding: "0 18px", background: "#dc2626", borderColor: "#dc2626", color: "#ffffff" }}
+                disabled={deleting}
+                onClick={confirmDelete}
+              >
+                {deleting ? "Deleting..." : "Confirm Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
