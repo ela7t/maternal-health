@@ -136,6 +136,11 @@ export async function POST(request: Request) {
       ethDay,
       lmpDate,
       gregLmpDate,
+      gregDate,
+      eddDate,
+      dateOfBirth,
+      consentMethod,
+      datingMethod,
       framingVariant,
       studyArm,
       riskStatus,
@@ -162,15 +167,17 @@ export async function POST(request: Request) {
       const d = parseInt(ethDay || lmpEthiopianDay || "1", 10);
       lmpGregorian = ethiopianToGregorian(y, m, d);
     } else {
-      const gDate = lmpDate || gregLmpDate;
-      if (!gDate) {
-        return NextResponse.json({ error: "LMP date is required for Gregorian calendar" }, { status: 400 });
+      const gDate = lmpDate || gregLmpDate || gregDate;
+      if (!gDate && !eddDate) {
+        return NextResponse.json({ error: "LMP or EDD date is required for Gregorian calendar" }, { status: 400 });
       }
-      lmpGregorian = new Date(gDate);
+      lmpGregorian = gDate
+        ? new Date(gDate)
+        : new Date(new Date(eddDate).getTime() - 280 * 24 * 3600 * 1000);
     }
 
-    // Calculate EDD using Naegele's rule (+280 days)
-    const eddGregorian = calculateEddFromLmp(lmpGregorian);
+    // Calculate EDD using Naegele's rule (+280 days) unless explicitly provided
+    const eddGregorian = eddDate ? new Date(eddDate) : calculateEddFromLmp(lmpGregorian);
 
     // Facility assignment
     let assignedFacilityId = facilityId ? parseInt(String(facilityId), 10) : null;
@@ -206,11 +213,12 @@ export async function POST(request: Request) {
           facilityId: assignedFacilityId!,
           publicCode,
           fullName: actualName,
+          dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
           kebele: kebele || "Kebele 01",
           studyArm: assignedStudyArm,
           preferredLanguage: language || preferredLanguage || "am",
           status: "active_pregnant",
-          consentRecordedBy: "Midwife Registry Staff",
+          consentRecordedBy: consentMethod || "Verbal Consent",
         },
       });
 
@@ -229,7 +237,7 @@ export async function POST(request: Request) {
           participantId: participant.id,
           lmpDate: lmpGregorian,
           eddDate: eddGregorian,
-          datingMethod: isEth ? "ethiopian_calendar" : "gregorian_lmp",
+          datingMethod: datingMethod || (isEth ? "ethiopian_calendar" : "lmp"),
           riskStatus: riskStatus || "low",
           outcome: "ongoing",
         },
