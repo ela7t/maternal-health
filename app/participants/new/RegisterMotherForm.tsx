@@ -2,6 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  calculateGestationalAge,
+  ethiopianToGregorian,
+  formatEthiopianDate,
+  gregorianToEthiopian,
+} from "@/lib/ethiopianCalendar";
 
 interface Facility {
   id: number;
@@ -82,6 +88,29 @@ export function RegisterMotherForm({
   const [gravida, setGravida] = useState("1");
   const [parity, setParity] = useState("0");
   const [riskStatus, setRiskStatus] = useState("low");
+
+  // Compute live clinical dating preview
+  let computedEdd: Date | null = null;
+  if (calendarType === "gregorian") {
+    if (eddDate) {
+      const d = new Date(eddDate);
+      if (!Number.isNaN(d.getTime())) computedEdd = d;
+    } else if (gregDate) {
+      const d = new Date(addDaysIso(gregDate, 280));
+      if (!Number.isNaN(d.getTime())) computedEdd = d;
+    }
+  } else if (ethYear && ethMonth && ethDay) {
+    try {
+      const lmpG = ethiopianToGregorian(ethYear, ethMonth, ethDay);
+      computedEdd = new Date(lmpG.getTime() + 280 * 24 * 3600 * 1000);
+    } catch {
+      computedEdd = null;
+    }
+  }
+
+  const computedGa = computedEdd ? calculateGestationalAge(computedEdd) : null;
+  const computedEddEth = computedEdd ? formatEthiopianDate(gregorianToEthiopian(computedEdd), "am") : "";
+  const computedEddIso = computedEdd ? computedEdd.toISOString().slice(0, 10) : "";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -566,6 +595,53 @@ export function RegisterMotherForm({
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Day</label>
                   <input type="number" className="form-input" min={1} max={30} value={ethDay} onChange={(e) => setEthDay(Number(e.target.value))} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Computed Clinical Dating Live Preview Box */}
+          {computedEdd && computedGa && (
+            <div
+              style={{
+                background: "rgba(16, 185, 129, 0.12)",
+                border: "1px solid rgba(16, 185, 129, 0.35)",
+                borderRadius: "var(--radius-md)",
+                padding: "1rem 1.25rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", color: "#34d399", fontWeight: 700, fontSize: "0.875rem", marginBottom: "0.75rem" }}>
+                <svg className="icon-svg sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+                <span>Computed Clinical Dating / የህክምና እርግዝና መረጃ</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.85rem" }}>
+                <div>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: "2px" }}>
+                    Gestational Age (የእርግዝና ዕድሜ)
+                  </div>
+                  <div className="tabular-nums" style={{ fontSize: "1.0625rem", fontWeight: 700, color: "#34d399" }}>
+                    {Math.max(0, computedGa.weeks)} weeks + {Math.max(0, computedGa.days)} days
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: "2px" }}>
+                    Estimated Due Date (የሚወለድበት ቀን - ዓ.ም)
+                  </div>
+                  <div className="tabular-nums" style={{ fontSize: "1.0625rem", fontWeight: 700, color: "var(--text-primary)" }}>
+                    {computedEddEth}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: "2px" }}>
+                    Gregorian EDD (ፈረንጅ ቀን)
+                  </div>
+                  <div className="tabular-nums" style={{ fontSize: "1.0625rem", fontWeight: 700, color: "#34d399" }}>
+                    {computedEddIso}
+                  </div>
                 </div>
               </div>
             </div>
