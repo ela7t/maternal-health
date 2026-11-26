@@ -4,6 +4,7 @@ import "./globals.css";
 import { NavLinks } from "@/components/NavLinks";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { I18nTextTranslator } from "@/components/I18nTextTranslator";
 
 export const metadata: Metadata = {
   title: "Maternal & Newborn Care",
@@ -63,6 +64,7 @@ export default function RootLayout({
         </header>
 
         <main className="main-content">{children}</main>
+        <I18nTextTranslator />
 
         <footer className="app-footer">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem", maxWidth: "1280px", margin: "0 auto" }}>
