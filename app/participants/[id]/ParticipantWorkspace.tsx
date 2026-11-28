@@ -210,10 +210,29 @@ export function ParticipantWorkspace({
   const pncAttended = pncVisits.filter((a) => a.status === "attended").length;
   const totalAttended = ancAttended + pncAttended;
 
+  // Build full 8-slot WHO ANC schedule (merging DB appointments + projected WHO dates)
+  const fullAncTimeline: Array<SerializedAppointment & { slotIdx: number }> = ANC_SCHEDULE.map((node, idx) => {
+    const existing = ancVisits.find((a) => getAncSlotIdx(a.scheduledFor, pregnancy?.eddIso) === idx);
+    if (existing) return { ...existing, slotIdx: idx };
+    const projectedDate = pregnancy?.eddIso
+      ? new Date(new Date(pregnancy.eddIso).getTime() - (40 - node.week) * 7 * 24 * 3600 * 1000)
+      : new Date();
+    return {
+      id: -(idx + 1), // negative synthetic id for projected WHO slot
+      kind: "anc",
+      scheduledFor: projectedDate.toISOString(),
+      status: "scheduled",
+      recordedBy: null,
+      notes: null,
+      slotIdx: idx,
+    };
+  });
+
   const nextVisit =
     appointments
       .filter((a) => a.status === "scheduled" || a.status === "missed")
       .sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime())[0] ||
+    fullAncTimeline.find((a) => a.status === "scheduled") ||
     null;
 
   const isNextVisitOverdue = Boolean(
@@ -230,18 +249,16 @@ export function ParticipantWorkspace({
       ? `PNC Contact`
       : null;
 
-  const currentGaWeeks = ga?.weeks ?? 0;
-
-  // Split ANC visits into attended/next vs remaining planned for collapse
+  // Split ANC visits into attended/next + 1 planned vs remaining planned for collapse
+  const firstPlannedIdx = fullAncTimeline.findIndex((x) => x.status === "scheduled" || x.status === "missed");
   const visibleAncVisits = showAllPlanned
-    ? ancVisits
-    : ancVisits.filter((v, idx) => {
+    ? fullAncTimeline
+    : fullAncTimeline.filter((v, idx) => {
         if (v.status === "attended" || v.status === "missed") return true;
         if (nextVisit && v.id === nextVisit.id) return true;
-        const firstPlannedIdx = ancVisits.findIndex((x) => x.status === "scheduled");
-        return idx <= firstPlannedIdx + 1;
+        return firstPlannedIdx >= 0 && idx <= firstPlannedIdx + 1;
       });
-  const hiddenPlannedCount = Math.max(0, ancVisits.length - visibleAncVisits.length);
+  const hiddenPlannedCount = Math.max(0, fullAncTimeline.length - visibleAncVisits.length);
 
   async function postAction(payload: Record<string, unknown>, onSuccess?: () => void) {
     setSubmitting(true);
@@ -717,9 +734,7 @@ export function ParticipantWorkspace({
 
                 <div className="continuum-stepper-track">
                   {ANC_SCHEDULE.map((node, i) => {
-                    const matchedApt = ancVisits.find(
-                      (a) => getAncSlotIdx(a.scheduledFor, pregnancy?.eddIso) === i
-                    );
+                    const matchedApt = fullAncTimeline[i];
                     const attended = Boolean(matchedApt && matchedApt.status === "attended");
                     const isNext = !delivered && nextVisit && matchedApt?.id === nextVisit.id;
                     const isMissedNode = Boolean(
@@ -824,7 +839,7 @@ export function ParticipantWorkspace({
               <div className="timeline">
                 {visibleAncVisits.map((visit) => {
                   const isNext = nextVisit?.id === visit.id;
-                  const slotIdx = getAncSlotIdx(visit.scheduledFor, pregnancy?.eddIso);
+                  const slotIdx = visit.slotIdx;
                   const ancNum = slotIdx + 1;
                   const targetWk = ANC_SCHEDULE[slotIdx]?.week;
                   return (
@@ -864,9 +879,9 @@ export function ParticipantWorkspace({
                                 onClick={() =>
                                   setVisitModal({
                                     open: true,
-                                    appointmentId: visit.id,
+                                    appointmentId: visit.id > 0 ? visit.id : null,
                                     kind: "anc",
-                                    visitDate: new Date().toISOString().slice(0, 10),
+                                    visitDate: new Date(visit.scheduledFor).toISOString().slice(0, 10),
                                     notes: "",
                                   })
                                 }
@@ -888,14 +903,17 @@ export function ParticipantWorkspace({
                   );
                 })}
 
-                {hiddenPlannedCount > 0 && (
+                {(hiddenPlannedCount > 0 || showAllPlanned) && fullAncTimeline.length > 3 && (
                   <div style={{ textAlign: "center", margin: "0.75rem 0 1rem" }}>
                     <button
                       type="button"
                       className="btn btn-outline btn-sm"
-                      onClick={() => setShowAllPlanned(true)}
+                      style={{ width: "100%", minHeight: "38px" }}
+                      onClick={() => setShowAllPlanned((v) => !v)}
                     >
-                      Show {hiddenPlannedCount} more planned contacts &darr;
+                      {showAllPlanned
+                        ? "Hide remaining planned contacts \u2303"
+                        : `Show ${hiddenPlannedCount} more planned contacts \u2304`}
                     </button>
                   </div>
                 )}

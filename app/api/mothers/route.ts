@@ -252,6 +252,24 @@ export async function POST(request: Request) {
             notes: "Initial ANC Checkup",
           },
         });
+      } else {
+        // Generate remaining WHO 2016 ANC schedule contacts from current gestational age onward
+        const currentGa = calculateGestationalAge(eddGregorian);
+        const whoWeeks = [16, 20, 26, 30, 34, 36, 38, 42];
+        const upcomingSlots = whoWeeks.filter((w) => w >= Math.max(12, currentGa.weeks));
+        for (const wk of upcomingSlots) {
+          const slotDate = new Date(eddGregorian.getTime() - (40 - wk) * 7 * 24 * 3600 * 1000);
+          await tx.appointment.create({
+            data: {
+              participantId: participant.id,
+              kind: "anc",
+              scheduledFor: slotDate,
+              status: "scheduled",
+              recordedBy: "WHO 2016 Auto-Schedule",
+              notes: `WHO ANC Contact (${wk} weeks)`,
+            },
+          });
+        }
       }
 
       return { participant, pregnancy };
