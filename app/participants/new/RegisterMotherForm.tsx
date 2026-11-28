@@ -369,7 +369,6 @@ export function RegisterMotherForm({
               <select className="form-select" value={language} onChange={(e) => setLanguage(e.target.value)}>
                 <option value="am">Amharic</option>
                 <option value="en">English</option>
-                <option value="gurage">Gurage</option>
               </select>
             </div>
 
@@ -384,17 +383,6 @@ export function RegisterMotherForm({
               </select>
             </div>
           </div>
-
-          {facilities.length > 1 && (
-            <div className="form-group">
-              <label className="form-label">Assigned Health Facility</label>
-              <select className="form-select" value={facilityId} onChange={(e) => setFacilityId(e.target.value)}>
-                {facilities.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
 
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1.5rem", paddingTop: "1rem", borderTop: "1px solid var(--border-color)" }}>
             <button
