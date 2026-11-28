@@ -1068,14 +1068,13 @@ export function ParticipantWorkspace({
                     <tr>
                       <th>Scheduled</th>
                       <th>Message body</th>
-                      <th>Segments</th>
                       <th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {outboxMessages.length === 0 ? (
                       <tr>
-                        <td colSpan={4} style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>
+                        <td colSpan={3} style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>
                           No SMS dispatches queued for this participant.
                         </td>
                       </tr>
@@ -1092,9 +1091,6 @@ export function ParticipantWorkspace({
                           </td>
                           <td style={{ fontSize: "0.875rem", color: "var(--text-primary)", maxWidth: "460px" }}>
                             {msg.messageContent}
-                          </td>
-                          <td>
-                            <span className="badge badge-neutral tabular-nums">{msg.segments} seg</span>
                           </td>
                           <td>
                             {["sent", "delivered", "submitted"].includes(msg.status) && (
