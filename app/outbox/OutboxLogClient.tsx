@@ -157,7 +157,8 @@ export function OutboxLogClient({ rows }: { rows: OutboxLogRow[] }) {
                         <Link
                           href={`/participants/${msg.participantId}`}
                           onClick={(e) => e.stopPropagation()}
-                          style={{ fontWeight: 700, color: "var(--text-primary)", textDecoration: "none", display: "block" }}
+                          className="patient-name"
+                          style={{ fontWeight: 700, display: "block" }}
                         >
                           {msg.participantName}
                         </Link>

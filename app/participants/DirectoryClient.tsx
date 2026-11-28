@@ -286,7 +286,8 @@ export function DirectoryClient({
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                   <Link
                     href={`/participants/${p.id}`}
-                    style={{ fontWeight: 700, color: "var(--text-primary)", textDecoration: "none" }}
+                    className="patient-name"
+                    style={{ fontWeight: 700 }}
                   >
                     {p.fullName}
                   </Link>
