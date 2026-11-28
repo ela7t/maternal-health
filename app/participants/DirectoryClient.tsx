@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -51,6 +51,24 @@ export function DirectoryClient({
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DirectoryParticipantRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (openMenuId === null) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (!(e.target as Element)?.closest(".dropdown-wrapper")) {
+        setOpenMenuId(null);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenMenuId(null);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [openMenuId]);
 
   async function confirmDelete() {
     if (!deleteTarget) return;
