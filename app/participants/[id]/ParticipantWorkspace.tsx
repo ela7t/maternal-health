@@ -720,7 +720,7 @@ export function ParticipantWorkspace({
                     const matchedApt = ancVisits.find(
                       (a) => getAncSlotIdx(a.scheduledFor, pregnancy?.eddIso) === i
                     );
-                    const attended = matchedApt ? matchedApt.status === "attended" : delivered;
+                    const attended = Boolean(matchedApt && matchedApt.status === "attended");
                     const isNext = !delivered && nextVisit && matchedApt?.id === nextVisit.id;
                     const isMissedNode = Boolean(
                       !attended &&
@@ -768,9 +768,7 @@ export function ParticipantWorkspace({
 
                   {PNC_SCHEDULE.map((node, i) => {
                     const matchedPnc = pncVisits[i];
-                    const attended = matchedPnc
-                      ? matchedPnc.status === "attended"
-                      : delivered && (pnc?.daysSinceDelivery ?? -1) >= node.day;
+                    const attended = Boolean(matchedPnc && matchedPnc.status === "attended");
                     return (
                       <div key={node.num} className="c-step-item">
                         <div className={`c-step-node ${attended ? "is-attended" : "is-upcoming"}`}>
@@ -782,13 +780,18 @@ export function ParticipantWorkspace({
                   })}
                 </div>
 
-                {ga && (
+                {!delivered && ga ? (
                   <div style={{ marginTop: "0.75rem", fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
                     &bull; <strong>Active Gestation:</strong>{" "}
                     {ga.trimester === 1 ? "1st" : ga.trimester === 2 ? "2nd" : "3rd"} Trimester ({ga.formatted})
                     {ga.daysUntilEdd !== null && ga.daysUntilEdd > 0 ? `, ${ga.daysUntilEdd} days to delivery.` : "."}
                   </div>
-                )}
+                ) : delivered && pnc ? (
+                  <div style={{ marginTop: "0.75rem", fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
+                    &bull; <strong>Postpartum Care:</strong> {pnc.formatted}
+                    {pregnancy?.deliveredAtShort ? ` (delivered ${pregnancy.deliveredAtShort})` : ""}.
+                  </div>
+                ) : null}
               </div>
 
               {/* Chronological Care Encounters */}
