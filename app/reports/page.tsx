@@ -9,15 +9,6 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function ReportsPage() {
-  const participants = await prisma.participant.findMany({
-    include: {
-      pregnancies: { orderBy: { id: "desc" }, take: 1 },
-      appointments: { orderBy: { scheduledFor: "asc" } },
-      outboxMessages: true,
-    },
-  });
-
 const MILESTONE_LABELS = [
   "ANC 1 (16w)",
   "ANC 2 (20w)",
@@ -32,25 +23,14 @@ const MILESTONE_LABELS = [
   "PNC 3 (6w)",
 ];
 
-export default async function ReportsPage({ searchParams }: Props) {
-  const sp = await searchParams;
-  const facilityId = sp.facility_id ? parseInt(sp.facility_id, 10) : null;
-  const validFacilityId = facilityId && !Number.isNaN(facilityId) ? facilityId : null;
-  const whereParticipant = validFacilityId ? { facilityId: validFacilityId } : {};
-
-  const [facilities, participants] = await Promise.all([
-    prisma.facility.findMany({ orderBy: { name: "asc" } }),
-    prisma.participant.findMany({
-      where: whereParticipant,
-      include: {
-        pregnancies: { orderBy: { id: "desc" }, take: 1 },
-        appointments: { orderBy: { scheduledFor: "asc" } },
-        outboxMessages: true,
-      },
-    }),
-  ]);
-
-  const selectedFacility = facilities.find((f) => f.id === validFacilityId) || null;
+export default async function ReportsPage() {
+  const participants = await prisma.participant.findMany({
+    include: {
+      pregnancies: { orderBy: { id: "desc" }, take: 1 },
+      appointments: { orderBy: { scheduledFor: "asc" } },
+      outboxMessages: true,
+    },
+  });
   const activeWomen = participants.filter((p) =>
     ["active_pregnant", "postnatal"].includes(p.status)
   ).length;
