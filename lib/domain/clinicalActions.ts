@@ -90,11 +90,32 @@ export async function recordDelivery(params: {
 export async function recordVisit(params: {
   participantId: number;
   appointmentId?: number | null;
+  contactType?: string;
   visitKind?: string;
   visitDate?: string;
+  visitTime?: string;
+  attendedDate?: string;
+  attendedTime?: string;
+  attendanceStatus?: string;
   notes?: string;
 }) {
-  const { participantId, appointmentId, visitKind, visitDate, notes } = params;
+  const {
+    participantId,
+    appointmentId,
+    contactType,
+    visitKind,
+    visitDate,
+    visitTime,
+    attendanceStatus,
+    notes,
+  } = params;
+
+  const targetStatus =
+    attendanceStatus === "scheduled" || attendanceStatus === "missed"
+      ? attendanceStatus
+      : "attended";
+  const inferredKind =
+    contactType?.startsWith("pnc") || visitKind === "pnc" ? "pnc" : "anc";
 
   return prisma.$transaction(async (tx) => {
     const participant = await tx.participant.findUnique({ where: { id: participantId } });
@@ -106,35 +127,40 @@ export async function recordVisit(params: {
       );
     }
 
+    const datePart = visitDate || new Date().toISOString().slice(0, 10);
+    const timePart = visitTime || "09:00";
+    const scheduledFor = new Date(`${datePart}T${timePart}:00`);
+    if (Number.isNaN(scheduledFor.getTime())) {
+      throw new DomainError("Invalid appointment date or time.", 400);
+    }
+
     if (appointmentId) {
       const existing = await tx.appointment.findUnique({ where: { id: appointmentId } });
       if (!existing || existing.participantId !== participantId) {
         throw new DomainError("Appointment not found for this participant.", 404);
       }
-      assertAppointmentTransition(existing.status, "attended");
+      if (targetStatus !== existing.status) {
+        assertAppointmentTransition(existing.status, targetStatus);
+      }
       return tx.appointment.update({
         where: { id: appointmentId },
         data: {
-          status: "attended",
+          status: targetStatus,
+          scheduledFor,
           recordedBy: "admin",
-          notes: notes?.trim() || "Visit recorded by clinician",
+          notes: notes?.trim() || existing.notes || "Visit recorded by clinician",
         },
       });
-    }
-
-    const scheduledFor = visitDate ? new Date(visitDate) : new Date();
-    if (Number.isNaN(scheduledFor.getTime())) {
-      throw new DomainError("Invalid visit date.", 400);
     }
 
     return tx.appointment.create({
       data: {
         participantId,
-        kind: visitKind === "pnc" ? "pnc" : "anc",
+        kind: inferredKind,
         scheduledFor,
-        status: "attended",
+        status: targetStatus,
         recordedBy: "admin",
-        notes: notes?.trim() || "Visit recorded by clinician",
+        notes: notes?.trim() || (contactType ? `${contactType.toUpperCase()} recorded` : "Visit recorded by clinician"),
       },
     });
   });

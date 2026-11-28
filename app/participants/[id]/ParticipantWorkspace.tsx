@@ -152,16 +152,44 @@ export function ParticipantWorkspace({
   const [visitModal, setVisitModal] = useState<{
     open: boolean;
     appointmentId: number | null;
-    kind: string;
+    contactType: string;
     visitDate: string;
+    visitTime: string;
+    attendedDate: string;
+    attendedTime: string;
+    attendanceStatus: "attended" | "scheduled" | "missed";
     notes: string;
   }>({
     open: false,
     appointmentId: null,
-    kind: "anc",
+    contactType: "anc_1",
     visitDate: new Date().toISOString().slice(0, 10),
+    visitTime: "09:00",
+    attendedDate: new Date().toISOString().slice(0, 10),
+    attendedTime: new Date().toTimeString().slice(0, 5),
+    attendanceStatus: "attended",
     notes: "",
   });
+
+  function openVisitContactModal(opts?: {
+    appointmentId?: number | null;
+    contactType?: string;
+    visitDate?: string;
+  }) {
+    const today = new Date().toISOString().slice(0, 10);
+    const nowTime = new Date().toTimeString().slice(0, 5);
+    setVisitModal({
+      open: true,
+      appointmentId: opts?.appointmentId ?? null,
+      contactType: opts?.contactType || (delivered ? "pnc_1" : `anc_${Math.max(1, nextAncSlotIdx + 1)}`),
+      visitDate: opts?.visitDate || today,
+      visitTime: "09:00",
+      attendedDate: today,
+      attendedTime: nowTime,
+      attendanceStatus: "attended",
+      notes: "",
+    });
+  }
   const [showBirthModal, setShowBirthModal] = useState(false);
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [showSmsModal, setShowSmsModal] = useState(false);
@@ -318,12 +346,14 @@ export function ParticipantWorkspace({
         className="btn btn-primary"
         style={{ minHeight: "44px", padding: "0 16px", fontWeight: 600 }}
         onClick={() =>
-          setVisitModal({
-            open: true,
-            appointmentId: nextVisit?.id ?? null,
-            kind: delivered ? "pnc" : "anc",
-            visitDate: new Date().toISOString().slice(0, 10),
-            notes: "",
+          openVisitContactModal({
+            appointmentId: nextVisit && nextVisit.id > 0 ? nextVisit.id : null,
+            contactType: delivered
+              ? "pnc_1"
+              : `anc_${Math.max(1, nextAncSlotIdx + 1)}`,
+            visitDate: nextVisit
+              ? new Date(nextVisit.scheduledFor).toISOString().slice(0, 10)
+              : undefined,
           })
         }
         disabled={submitting}
@@ -817,15 +847,7 @@ export function ParticipantWorkspace({
                 <button
                   type="button"
                   className="btn btn-primary btn-sm"
-                  onClick={() =>
-                    setVisitModal({
-                      open: true,
-                      appointmentId: null,
-                      kind: delivered ? "pnc" : "anc",
-                      visitDate: new Date().toISOString().slice(0, 10),
-                      notes: "",
-                    })
-                  }
+                  onClick={() => openVisitContactModal()}
                 >
                   + Record Encounter
                 </button>
@@ -872,12 +894,10 @@ export function ParticipantWorkspace({
                                 className={`btn ${isNext ? "btn-primary" : "btn-outline"}`}
                                 style={{ minHeight: "36px", padding: "0 14px", fontWeight: 600, fontSize: "0.8125rem" }}
                                 onClick={() =>
-                                  setVisitModal({
-                                    open: true,
+                                  openVisitContactModal({
                                     appointmentId: visit.id > 0 ? visit.id : null,
-                                    kind: "anc",
+                                    contactType: `anc_${ancNum}`,
                                     visitDate: new Date(visit.scheduledFor).toISOString().slice(0, 10),
-                                    notes: "",
                                   })
                                 }
                               >
@@ -1011,12 +1031,10 @@ export function ParticipantWorkspace({
                                 type="button"
                                 className="btn btn-outline btn-sm"
                                 onClick={() =>
-                                  setVisitModal({
-                                    open: true,
+                                  openVisitContactModal({
                                     appointmentId: visit.id,
-                                    kind: "pnc",
-                                    visitDate: new Date().toISOString().slice(0, 10),
-                                    notes: "",
+                                    contactType: `pnc_${idx + 1}`,
+                                    visitDate: new Date(visit.scheduledFor).toISOString().slice(0, 10),
                                   })
                                 }
                               >
@@ -1267,13 +1285,23 @@ export function ParticipantWorkspace({
         </div>
       </div>
 
-      {/* MODAL: Record Visit */}
+      {/* MODAL: Record ANC / PNC Visit Contact (1:1 Django woman_detail.html) */}
       {visitModal.open && (
         <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && setVisitModal((v) => ({ ...v, open: false }))}>
-          <div className="card modal-content" style={{ maxWidth: "460px", width: "100%", padding: "24px" }}>
-            <h3 style={{ margin: "0 0 14px", fontSize: "1.125rem", fontWeight: 700, color: "var(--text-primary)" }}>
-              Record Clinical Encounter
-            </h3>
+          <div className="card modal-content" style={{ maxWidth: "520px", width: "100%", padding: "24px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "12px", marginBottom: "16px", borderBottom: "1px solid var(--border-color)" }}>
+              <h3 style={{ margin: 0, fontSize: "1.125rem", fontWeight: 700, color: "var(--text-primary)" }}>
+                Record ANC / PNC Visit Contact
+              </h3>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setVisitModal((v) => ({ ...v, open: false }))}
+                style={{ background: "transparent", border: "none", color: "var(--text-muted)", fontSize: "1.25rem", cursor: "pointer", padding: "4px 8px" }}
+              >
+                &times;
+              </button>
+            </div>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -1281,53 +1309,128 @@ export function ParticipantWorkspace({
                   {
                     action: "record_visit",
                     appointmentId: visitModal.appointmentId,
-                    visitKind: visitModal.kind,
+                    contactType: visitModal.contactType,
+                    visitKind: visitModal.contactType.startsWith("pnc") ? "pnc" : "anc",
                     visitDate: visitModal.visitDate,
+                    visitTime: visitModal.visitTime,
+                    attendedDate: visitModal.attendedDate,
+                    attendedTime: visitModal.attendedTime,
+                    attendanceStatus: visitModal.attendanceStatus,
                     notes: visitModal.notes,
                   },
                   () => setVisitModal((v) => ({ ...v, open: false }))
                 );
               }}
             >
-              {!visitModal.appointmentId && (
-                <div className="form-group">
-                  <label className="form-label">Encounter Type</label>
-                  <select
-                    className="form-select"
-                    value={visitModal.kind}
-                    onChange={(e) => setVisitModal((v) => ({ ...v, kind: e.target.value }))}
-                  >
-                    <option value="anc">Antenatal Care (ANC)</option>
-                    <option value="pnc">Postnatal Care (PNC)</option>
-                  </select>
-                </div>
-              )}
               <div className="form-group">
-                <label className="form-label">Visit Date</label>
-                <input
-                  type="date"
-                  className="form-input"
-                  value={visitModal.visitDate}
-                  onChange={(e) => setVisitModal((v) => ({ ...v, visitDate: e.target.value }))}
-                  required
-                />
+                <label className="form-label">
+                  Contact Type <span className="required">*</span>
+                </label>
+                <select
+                  className="form-select"
+                  value={visitModal.contactType}
+                  onChange={(e) => setVisitModal((v) => ({ ...v, contactType: e.target.value }))}
+                >
+                  <option value="anc_1">ANC Contact 1 (16 weeks)</option>
+                  <option value="anc_2">ANC Contact 2 (20 weeks)</option>
+                  <option value="anc_3">ANC Contact 3 (26 weeks)</option>
+                  <option value="anc_4">ANC Contact 4 (30 weeks)</option>
+                  <option value="anc_5">ANC Contact 5 (34 weeks)</option>
+                  <option value="anc_6">ANC Contact 6 (36 weeks)</option>
+                  <option value="anc_7">ANC Contact 7 (38 weeks)</option>
+                  <option value="anc_8">ANC Contact 8 (42 weeks)</option>
+                  <option value="pnc_1">PNC 1 (Within 24h)</option>
+                  <option value="pnc_2">PNC 2 (Day 3)</option>
+                  <option value="pnc_3">PNC 3 (Day 7–14)</option>
+                  <option value="pnc_4">PNC 4 (Week 6)</option>
+                </select>
               </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div className="form-group">
+                  <label className="form-label">
+                    Appointment Date <span className="required">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={visitModal.visitDate}
+                    onChange={(e) => setVisitModal((v) => ({ ...v, visitDate: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">
+                    Appointment Time <span className="required">*</span>
+                  </label>
+                  <input
+                    type="time"
+                    className="form-input"
+                    value={visitModal.visitTime}
+                    onChange={(e) => setVisitModal((v) => ({ ...v, visitTime: e.target.value }))}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div className="form-group">
+                  <label className="form-label">Attended Date (Optional)</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={visitModal.attendedDate}
+                    onChange={(e) => setVisitModal((v) => ({ ...v, attendedDate: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Attended Time (Optional)</label>
+                  <input
+                    type="time"
+                    className="form-input"
+                    value={visitModal.attendedTime}
+                    onChange={(e) => setVisitModal((v) => ({ ...v, attendedTime: e.target.value }))}
+                  />
+                </div>
+              </div>
+
               <div className="form-group">
-                <label className="form-label">Clinical Notes (Optional)</label>
+                <label className="form-label">
+                  Attendance Status <span className="required">*</span>
+                </label>
+                <select
+                  className="form-select"
+                  value={visitModal.attendanceStatus}
+                  onChange={(e) =>
+                    setVisitModal((v) => ({
+                      ...v,
+                      attendanceStatus: e.target.value as "attended" | "scheduled" | "missed",
+                    }))
+                  }
+                >
+                  <option value="attended">Attended</option>
+                  <option value="scheduled">Planned / Scheduled</option>
+                  <option value="missed">Missed</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Clinical Notes</label>
                 <textarea
                   className="form-textarea"
                   rows={3}
                   value={visitModal.notes}
                   onChange={(e) => setVisitModal((v) => ({ ...v, notes: e.target.value }))}
-                  placeholder="BP, fetal heart rate, iron/folate dispensed..."
+                  placeholder="Blood pressure, weight, iron folate, fetal heart tones..."
                 />
               </div>
+
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "16px" }}>
-                <button type="button" className="btn btn-outline" onClick={() => setVisitModal((v) => ({ ...v, open: false }))}>
+                <button type="button" className="btn btn-outline" style={{ minHeight: "44px" }} onClick={() => setVisitModal((v) => ({ ...v, open: false }))}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={submitting}>
-                  {submitting ? "Saving..." : "Confirm Visit"}
+                <button type="submit" className="btn btn-primary" style={{ minHeight: "44px", fontWeight: 600 }} disabled={submitting}>
+                  {submitting ? "Saving..." : "Save Visit Record"}
                 </button>
               </div>
             </form>

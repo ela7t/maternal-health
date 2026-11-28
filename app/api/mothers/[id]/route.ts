@@ -191,8 +191,13 @@ export async function POST(
       lossReason,
       customMessage,
       appointmentId,
+      contactType,
       visitKind,
       visitDate,
+      visitTime,
+      attendedDate,
+      attendedTime,
+      attendanceStatus,
       notes,
       phoneNumber,
       ownerType,
@@ -285,8 +290,13 @@ export async function POST(
       const apt = await recordVisit({
         participantId,
         appointmentId: appointmentId ? Number(appointmentId) : null,
+        contactType,
         visitKind,
         visitDate,
+        visitTime,
+        attendedDate,
+        attendedTime,
+        attendanceStatus,
         notes,
       });
       return NextResponse.json({ success: true, appointment: apt });
