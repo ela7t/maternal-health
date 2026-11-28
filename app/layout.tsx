@@ -5,6 +5,7 @@ import { NavLinks } from "@/components/NavLinks";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { I18nTextTranslator } from "@/components/I18nTextTranslator";
+import { LogoutButton } from "@/components/LogoutButton";
 
 export const metadata: Metadata = {
   title: "Maternal & Newborn Care",
@@ -59,6 +60,7 @@ export default function RootLayout({
                 <span className="status-dot" />
                 <span className="user-chip-name">admin</span>
               </div>
+              <LogoutButton />
             </div>
           </div>
         </header>
