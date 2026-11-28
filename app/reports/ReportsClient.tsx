@@ -297,67 +297,94 @@ export function ReportsClient({
                 </span>
               </div>
 
-              <div style={{ position: "relative", paddingLeft: "175px", paddingBottom: "22px" }}>
-                {/* Vertical Gridlines 0% - 100% */}
-                <div style={{ position: "absolute", top: 0, bottom: "22px", left: "175px", right: 0, pointerEvents: "none" }}>
-                  {[0, 20, 40, 60, 80, 100].map((tick) => (
-                    <div
-                      key={tick}
-                      style={{
-                        position: "absolute",
-                        left: `${tick}%`,
-                        top: 0,
-                        bottom: 0,
-                        borderLeft: "1px dashed var(--border-color)",
-                      }}
-                    >
-                      <span
-                        className="tabular-nums"
-                        style={{
-                          position: "absolute",
-                          bottom: "-20px",
-                          transform: "translateX(-50%)",
-                          fontSize: "0.6875rem",
-                          color: "var(--text-muted)",
-                        }}
-                      >
-                        {tick}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
+              {(() => {
+                const chartRows = benchmarks.filter((b) => b.whoTarget !== null);
+                const chartW = 840;
+                const chartH = 260;
+                const padL = 44;
+                const padR = 16;
+                const padT = 18;
+                const padB = 46;
+                const plotW = chartW - padL - padR;
+                const plotH = chartH - padT - padB;
+                const groupW = plotW / Math.max(1, chartRows.length);
+                const barW = Math.min(20, (groupW - 22) / 3);
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.9rem", position: "relative", zIndex: 1 }}>
-                  {benchmarks
-                    .filter((b) => b.whoTarget !== null)
-                    .map((b) => (
-                      <div key={b.shortLabel} style={{ position: "relative", display: "flex", alignItems: "center" }}>
-                        <span
-                          style={{
-                            position: "absolute",
-                            left: "-175px",
-                            width: "163px",
-                            fontSize: "0.75rem",
-                            color: "var(--text-secondary)",
-                            textAlign: "right",
-                          }}
-                        >
-                          {b.shortLabel}
-                        </span>
-                        <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "3px" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <div style={{ height: "7px", width: `${Math.max(1.5, b.ratePct)}%`, background: "#14b8a6", borderRadius: "3px" }} title={`Cohort: ${b.ratePct.toFixed(1)}%`} />
-                            <span className="tabular-nums" style={{ fontSize: "0.6875rem", color: "#14b8a6", fontWeight: 600 }}>
+                return (
+                  <div style={{ width: "100%", overflowX: "auto" }}>
+                    <svg
+                      viewBox={`0 0 ${chartW} ${chartH}`}
+                      style={{ width: "100%", minWidth: "560px", height: "auto", display: "block" }}
+                      role="img"
+                      aria-label="Visual Quality Benchmarks Bar Chart"
+                    >
+                      {[0, 20, 40, 60, 80, 100].map((tick) => {
+                        const y = padT + plotH - (tick / 100) * plotH;
+                        return (
+                          <g key={tick}>
+                            <line
+                              x1={padL}
+                              y1={y}
+                              x2={chartW - padR}
+                              y2={y}
+                              stroke="var(--border-color)"
+                              strokeDasharray="3 3"
+                            />
+                            <text
+                              x={padL - 8}
+                              y={y + 4}
+                              textAnchor="end"
+                              fill="var(--text-muted)"
+                              fontSize="11"
+                            >
+                              {tick}%
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {chartRows.map((b, i) => {
+                        const gx = padL + i * groupW + (groupW - barW * 3 - 8) / 2;
+                        const h1 = Math.max(2, (b.ratePct / 100) * plotH);
+                        const h2 = ((b.whoTarget ?? 0) / 100) * plotH;
+                        const h3 = ((b.edhsBaseline ?? 0) / 100) * plotH;
+                        const y1 = padT + plotH - h1;
+                        const y2 = padT + plotH - h2;
+                        const y3 = padT + plotH - h3;
+                        const cx = padL + i * groupW + groupW / 2;
+                        return (
+                          <g key={b.shortLabel}>
+                            <rect x={gx} y={y1} width={barW} height={h1} rx="3" fill="#14b8a6">
+                              <title>{`${b.shortLabel} - Hospital Cohort: ${b.ratePct.toFixed(1)}%`}</title>
+                            </rect>
+                            <text x={gx + barW / 2} y={y1 - 4} textAnchor="middle" fill="#14b8a6" fontSize="10" fontWeight="600">
                               {b.ratePct.toFixed(0)}%
-                            </span>
-                          </div>
-                          <div style={{ height: "6px", width: `${b.whoTarget ?? 0}%`, background: "#f59e0b", borderRadius: "3px", opacity: 0.85 }} title={`WHO Target: ${b.whoTarget}%`} />
-                          <div style={{ height: "6px", width: `${b.edhsBaseline ?? 0}%`, background: "#64748b", borderRadius: "3px", opacity: 0.75 }} title={`EDHS: ${b.edhsDisplay}`} />
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
+                            </text>
+
+                            <rect x={gx + barW + 4} y={y2} width={barW} height={h2} rx="3" fill="#f59e0b" opacity="0.88">
+                              <title>{`${b.shortLabel} - WHO Target: ${b.whoTarget}%`}</title>
+                            </rect>
+
+                            <rect x={gx + (barW + 4) * 2} y={y3} width={barW} height={h3} rx="3" fill="#64748b" opacity="0.78">
+                              <title>{`${b.shortLabel} - EDHS Baseline: ${b.edhsDisplay}`}</title>
+                            </rect>
+
+                            <text
+                              x={cx}
+                              y={padT + plotH + 16}
+                              textAnchor="middle"
+                              fill="var(--text-secondary)"
+                              fontSize="10.5"
+                            >
+                              {b.shortLabel.length > 16 ? `${b.shortLabel.slice(0, 15)}…` : b.shortLabel}
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  </div>
+                );
+              })()}
 
               <div style={{ fontSize: "0.6875rem", color: "var(--text-muted)", marginTop: "0.75rem", textAlign: "right" }}>
                 Teal = Hospital Cohort Actual; Amber = WHO Quality Goal; Slate = Ethiopian DHS National Baseline.
