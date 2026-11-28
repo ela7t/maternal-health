@@ -9,9 +9,14 @@ import {
 
 export const dynamic = "force-dynamic";
 
-interface Props {
-  searchParams: Promise<{ facility_id?: string }>;
-}
+export default async function ReportsPage() {
+  const participants = await prisma.participant.findMany({
+    include: {
+      pregnancies: { orderBy: { id: "desc" }, take: 1 },
+      appointments: { orderBy: { scheduledFor: "asc" } },
+      outboxMessages: true,
+    },
+  });
 
 const MILESTONE_LABELS = [
   "ANC 1 (16w)",
@@ -280,13 +285,7 @@ export default async function ReportsPage({ searchParams }: Props) {
 
   return (
     <ReportsClient
-      facilities={facilities.map((f) => ({ id: f.id, name: f.name }))}
-      selectedFacilityId={validFacilityId}
-      facilitySubtitle={
-        selectedFacility
-          ? `${selectedFacility.name} (${selectedFacility.code})`
-          : "Wolkite University Specialized Hospital (WUSH-001)"
-      }
+      facilitySubtitle="Wolkite University Specialized Hospital (WUSH-001)"
       generatedAt={generatedAt}
       kpis={{
         activeWomen,

@@ -96,7 +96,7 @@ export default async function RootLayout({
           <footer className="app-footer">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem", maxWidth: "1280px", margin: "0 auto" }}>
               <span>
-                <strong>Maternal &amp; Newborn Care</strong> &bull; Wolkite &amp; Jimma Primary Health Program
+                <strong>Maternal &amp; Newborn Care</strong> &bull; Wolkite University Specialized Hospital (WUSH-001)
               </span>
               <span style={{ color: "var(--text-muted)" }}>
                 Ethio Telecom &amp; Safaricom &bull; Dual Calendar (E.C. / G.C.)

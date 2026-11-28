@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 export interface BenchmarkRow {
   label: string;
@@ -35,8 +34,6 @@ export interface RiskStageRow {
 }
 
 export interface ReportsClientProps {
-  facilities: Array<{ id: number; name: string }>;
-  selectedFacilityId: number | null;
   facilitySubtitle: string;
   generatedAt: string;
   kpis: {
@@ -56,8 +53,6 @@ export interface ReportsClientProps {
 }
 
 export function ReportsClient({
-  facilities,
-  selectedFacilityId,
   facilitySubtitle,
   generatedAt,
   kpis,
@@ -65,11 +60,10 @@ export function ReportsClient({
   cascade,
   riskStages,
 }: ReportsClientProps) {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"indicators" | "cascade" | "cohort" | "all">("indicators");
   const [exportOpen, setExportOpen] = useState(false);
 
-  const facilityQuery = selectedFacilityId ? `&facility_id=${selectedFacilityId}` : "";
+  const facilityQuery = "";
   const maxCascade = Math.max(1, ...cascade.map((c) => c.scheduled));
   const maxRisk = Math.max(1, ...riskStages.map((r) => r.total));
 
@@ -82,18 +76,9 @@ export function ReportsClient({
       {/* Header */}
       <div style={{ marginBottom: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.25rem" }}>
-            <h1 style={{ fontSize: "1.375rem", fontWeight: 700, color: "var(--text-primary)", margin: 0, lineHeight: 1.25 }}>
-              Clinical health indicators &amp; research reports
-            </h1>
-            <span className="badge badge-neutral" style={{ fontSize: "0.75rem" }}>
-              <svg className="icon-svg sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-              <span>Strictly De-Identified</span>
-            </span>
-          </div>
+          <h1 style={{ fontSize: "1.375rem", fontWeight: 700, color: "var(--text-primary)", margin: "0 0 0.25rem 0", lineHeight: 1.25 }}>
+            Clinical health indicators &amp; research reports
+          </h1>
           <p style={{ color: "var(--text-secondary)", margin: 0, fontSize: "0.875rem" }}>
             {facilitySubtitle} &bull; WHO care continuum &amp; research microdata
           </p>
@@ -101,23 +86,6 @@ export function ReportsClient({
 
         {/* Actions */}
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-          <select
-            className="form-select"
-            style={{ minHeight: "44px", padding: "0.375rem 0.75rem", fontSize: "0.875rem" }}
-            value={selectedFacilityId ?? ""}
-            onChange={(e) => {
-              const val = e.target.value;
-              router.push(val ? `/reports?facility_id=${val}` : "/reports");
-            }}
-          >
-            <option value="">All Facilities</option>
-            {facilities.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
-
           <div style={{ position: "relative", display: "inline-block" }}>
             <button
               type="button"
@@ -329,19 +297,66 @@ export function ReportsClient({
                 </span>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>
-                {benchmarks
-                  .filter((b) => b.whoTarget !== null)
-                  .map((b) => (
-                    <div key={b.shortLabel} style={{ display: "grid", gridTemplateColumns: "165px 1fr", gap: "0.75rem", alignItems: "center" }}>
-                      <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textAlign: "right" }}>{b.shortLabel}</span>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-                        <div style={{ height: "5px", width: `${Math.max(1, b.ratePct)}%`, background: "#14b8a6", borderRadius: "2px" }} title={`Cohort: ${b.ratePct.toFixed(1)}%`} />
-                        <div style={{ height: "5px", width: `${b.whoTarget ?? 0}%`, background: "#f59e0b", borderRadius: "2px" }} title={`WHO Target: ${b.whoTarget}%`} />
-                        <div style={{ height: "5px", width: `${b.edhsBaseline ?? 0}%`, background: "#64748b", borderRadius: "2px" }} title={`EDHS: ${b.edhsDisplay}`} />
-                      </div>
+              <div style={{ position: "relative", paddingLeft: "175px", paddingBottom: "22px" }}>
+                {/* Vertical Gridlines 0% - 100% */}
+                <div style={{ position: "absolute", top: 0, bottom: "22px", left: "175px", right: 0, pointerEvents: "none" }}>
+                  {[0, 20, 40, 60, 80, 100].map((tick) => (
+                    <div
+                      key={tick}
+                      style={{
+                        position: "absolute",
+                        left: `${tick}%`,
+                        top: 0,
+                        bottom: 0,
+                        borderLeft: "1px dashed var(--border-color)",
+                      }}
+                    >
+                      <span
+                        className="tabular-nums"
+                        style={{
+                          position: "absolute",
+                          bottom: "-20px",
+                          transform: "translateX(-50%)",
+                          fontSize: "0.6875rem",
+                          color: "var(--text-muted)",
+                        }}
+                      >
+                        {tick}%
+                      </span>
                     </div>
                   ))}
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.9rem", position: "relative", zIndex: 1 }}>
+                  {benchmarks
+                    .filter((b) => b.whoTarget !== null)
+                    .map((b) => (
+                      <div key={b.shortLabel} style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                        <span
+                          style={{
+                            position: "absolute",
+                            left: "-175px",
+                            width: "163px",
+                            fontSize: "0.75rem",
+                            color: "var(--text-secondary)",
+                            textAlign: "right",
+                          }}
+                        >
+                          {b.shortLabel}
+                        </span>
+                        <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "3px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <div style={{ height: "7px", width: `${Math.max(1.5, b.ratePct)}%`, background: "#14b8a6", borderRadius: "3px" }} title={`Cohort: ${b.ratePct.toFixed(1)}%`} />
+                            <span className="tabular-nums" style={{ fontSize: "0.6875rem", color: "#14b8a6", fontWeight: 600 }}>
+                              {b.ratePct.toFixed(0)}%
+                            </span>
+                          </div>
+                          <div style={{ height: "6px", width: `${b.whoTarget ?? 0}%`, background: "#f59e0b", borderRadius: "3px", opacity: 0.85 }} title={`WHO Target: ${b.whoTarget}%`} />
+                          <div style={{ height: "6px", width: `${b.edhsBaseline ?? 0}%`, background: "#64748b", borderRadius: "3px", opacity: 0.75 }} title={`EDHS: ${b.edhsDisplay}`} />
+                        </div>
+                      </div>
+                    ))}
+                </div>
               </div>
 
               <div style={{ fontSize: "0.6875rem", color: "var(--text-muted)", marginTop: "0.75rem", textAlign: "right" }}>

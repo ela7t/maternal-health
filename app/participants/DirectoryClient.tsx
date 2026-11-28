@@ -145,7 +145,7 @@ export function DirectoryClient({
             Participant Directory
           </h1>
           <p style={{ margin: "0.35rem 0 0 0", color: "var(--text-muted)", fontSize: "0.875rem" }}>
-            Active pregnant mothers and postpartum cases under Wolkite &amp; Jimma Primary Health Program.
+            Active pregnant mothers and postpartum cases under Wolkite University Specialized Hospital (WUSH-001).
           </p>
         </div>
         <Link href="/participants/new" className="btn btn-primary btn-enroll-action">

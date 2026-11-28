@@ -1,43 +1,16 @@
 import Link from "next/link";
 import prisma from "@/lib/prisma";
-import { FacilitySelect } from "./FacilitySelect";
 
 export const dynamic = "force-dynamic";
 
-interface Props {
-  searchParams: Promise<{ facility_id?: string }>;
-}
-
-export default async function DashboardPage({ searchParams }: Props) {
-  const sp = await searchParams;
-  const facilityId = sp.facility_id ? parseInt(sp.facility_id, 10) : null;
-  const validFacilityId = facilityId && !Number.isNaN(facilityId) ? facilityId : null;
-  const participantWhere = validFacilityId ? { facilityId: validFacilityId } : {};
-
-  const [facilities, participants] = await Promise.all([
-    prisma.facility.findMany({
-      include: {
-        participants: {
-          include: {
-            pregnancies: true,
-            appointments: true,
-            outboxMessages: true,
-          },
-        },
-      },
-      orderBy: { name: "asc" },
-    }),
-    prisma.participant.findMany({
-      where: participantWhere,
-      include: {
-        pregnancies: { orderBy: { id: "desc" }, take: 1 },
-        appointments: true,
-        outboxMessages: true,
-      },
-    }),
-  ]);
-
-  const selectedFacility = facilities.find((f) => f.id === validFacilityId) || null;
+export default async function DashboardPage() {
+  const participants = await prisma.participant.findMany({
+    include: {
+      pregnancies: { orderBy: { id: "desc" }, take: 1 },
+      appointments: true,
+      outboxMessages: true,
+    },
+  });
   const now = new Date();
   const cutoff14d = new Date(now.getTime() - 14 * 24 * 3600 * 1000);
 
@@ -94,31 +67,19 @@ export default async function DashboardPage({ searchParams }: Props) {
   const smsRate = rate(deliveredSms, allSms.length);
   const optOutRate = rate(optedOutCount, participants.length);
 
-  const exportQuery = validFacilityId ? `&facility_id=${validFacilityId}` : "";
-
   return (
     <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "1rem", marginBottom: "1.5rem" }}>
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.25rem" }}>
-            <h1 className="page-title" style={{ margin: 0 }}>
-              Facility Health Dashboard
-            </h1>
-            <span className="badge badge-neutral">Strictly De-Identified</span>
-          </div>
-          <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "0.875rem" }}>
-            {selectedFacility
-              ? `${selectedFacility.name} (${selectedFacility.code})`
-              : "Wolkite & Jimma Primary Health Program"}{" "}
-            &bull; Maternal &amp; Newborn Care Monitoring
+          <h1 className="page-title" style={{ margin: 0 }}>
+            Facility Health Dashboard
+          </h1>
+          <p style={{ margin: "0.25rem 0 0 0", color: "var(--text-secondary)", fontSize: "0.875rem" }}>
+            Wolkite University Specialized Hospital (WUSH-001) &bull; Maternal &amp; Newborn Care Monitoring
           </p>
         </div>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-          <FacilitySelect
-            facilities={facilities.map((f) => ({ id: f.id, name: f.name }))}
-            selectedId={validFacilityId}
-          />
-          <a href={`/api/reports/export?format=csv${exportQuery}`} className="btn btn-outline" style={{ minHeight: "40px" }}>
+          <a href="/api/reports/export?format=csv" className="btn btn-outline" style={{ minHeight: "40px" }}>
             CSV Export
           </a>
           <Link href="/reports" className="btn btn-primary" style={{ minHeight: "40px" }}>
@@ -261,90 +222,6 @@ export default async function DashboardPage({ searchParams }: Props) {
                   )}
                 </td>
               </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Cross-Facility Comparison Table */}
-      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-        <div className="card-header" style={{ padding: "1rem 1.25rem", marginBottom: 0 }}>
-          <h2 className="card-title">Cross-facility comparison</h2>
-          <span className="badge badge-neutral tabular-nums">{facilities.length} facilities</span>
-        </div>
-        <div className="table-responsive">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Facility code &amp; name</th>
-                <th style={{ textAlign: "right" }}>Active mothers</th>
-                <th style={{ textAlign: "right" }}>ANC attended</th>
-                <th style={{ textAlign: "right" }}>Deliveries</th>
-                <th style={{ textAlign: "right" }}>PNC attended</th>
-                <th style={{ textAlign: "right" }}>SMS delivery</th>
-              </tr>
-            </thead>
-            <tbody>
-              {facilities.map((fac) => {
-                const facActive = fac.participants.filter((p) =>
-                  ["active_pregnant", "postnatal"].includes(p.status)
-                ).length;
-                const facAncAll = fac.participants.flatMap((p) =>
-                  p.appointments.filter((a) => a.kind === "anc")
-                );
-                const facAncDone = facAncAll.filter((a) => a.status === "attended").length;
-                const facAncPct =
-                  facAncAll.length > 0 ? Math.round((facAncDone / facAncAll.length) * 100) : null;
-                const facDeliveries = fac.participants.flatMap((p) =>
-                  p.pregnancies.filter((g) => g.deliveredAt !== null)
-                ).length;
-                const facPncDone = fac.participants.flatMap((p) =>
-                  p.appointments.filter((a) => a.kind === "pnc" && a.status === "attended")
-                ).length;
-                const facSmsAll = fac.participants.flatMap((p) => p.outboxMessages);
-                const facSmsOk = facSmsAll.filter((m) =>
-                  ["sent", "delivered", "submitted"].includes(m.status)
-                ).length;
-                const facSmsPct =
-                  facSmsAll.length > 0 ? Math.round((facSmsOk / facSmsAll.length) * 100) : null;
-
-                return (
-                  <tr key={fac.id}>
-                    <td>
-                      <div style={{ fontWeight: 700 }}>{fac.name}</div>
-                      <span className="mrn-badge">{fac.code}</span>
-                    </td>
-                    <td className="tabular-nums" style={{ textAlign: "right", fontWeight: 700 }}>
-                      {facActive}
-                    </td>
-                    <td className="tabular-nums" style={{ textAlign: "right" }}>
-                      {facAncPct !== null ? (
-                        <span className={`badge ${facAncPct >= 80 ? "badge-success" : "badge-neutral"}`}>
-                          {facAncPct}%
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="tabular-nums" style={{ textAlign: "right" }}>
-                      {facDeliveries}
-                    </td>
-                    <td className="tabular-nums" style={{ textAlign: "right" }}>
-                      {facPncDone}
-                    </td>
-                    <td className="tabular-nums" style={{ textAlign: "right", fontWeight: 600 }}>
-                      {facSmsPct !== null ? `${facSmsPct}%` : "—"}
-                    </td>
-                  </tr>
-                );
-              })}
-              {facilities.length === 0 && (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: "2.5rem", color: "var(--text-muted)" }}>
-                    No facilities registered yet.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
